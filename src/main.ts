@@ -1210,10 +1210,35 @@ function animate() {
     if (minDistance < 20) {
       closestFood.eaten = true;
     }
+  } else {
+    // If no food is nearby, randomly select a new target when we're close to the current one
+    const dx = target.x - creature[0].x;
+    const dy = target.y - creature[0].y;
+    const distanceToTarget = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distanceToTarget < 50) {
+      // Select a random point in front of the fish (within 120 degrees)
+      const margin = 100; // Keep away from edges
+      const maxAngle = Math.PI * 2/3; // 120 degrees in radians
+      const randomAngle = (Math.random() - 0.5) * maxAngle; // Random angle between -60 and +60 degrees
+      const targetAngle = creature[0].angle + randomAngle;
+      
+      // Calculate distance (further for more interesting movement)
+      const distance = 200 + Math.random() * 300; // Between 200 and 500 pixels away
+      
+      // Calculate new target position
+      target.x = creature[0].x + Math.cos(targetAngle) * distance;
+      target.y = creature[0].y + Math.sin(targetAngle) * distance;
+      
+      // Keep within canvas bounds
+      target.x = Math.max(margin, Math.min(canvas.width - margin, target.x));
+      target.y = Math.max(margin, Math.min(canvas.height - margin, target.y));
+    }
   }
 
-  // Move head towards target
-  moveTowardsTarget(creature[0], target, 5);
+  // Move head towards target with reduced speed when no food is nearby
+  const speed = closestFood ? 5 : 1.25; // 5/4 = 1.25 when no food
+  moveTowardsTarget(creature[0], target, speed);
 
   // Update follower nodes to maintain distance from their leaders
   for (let i = 1; i < creature.length; i++) {
