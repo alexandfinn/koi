@@ -855,6 +855,86 @@ function createBubbleParticles(canvasWidth: number, canvasHeight: number, count:
   return bubbles;
 }
 
+type Food = {
+  x: number;
+  y: number;
+  size: number;
+  eaten: boolean;
+};
+
+type Ripple = {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  opacity: number;
+  speed: number;
+  delay: number;  // Delay before this ripple starts
+};
+
+// Initialize food and ripple arrays
+let foods: Food[] = [];
+let ripples: Ripple[] = [];
+
+function createRipples(x: number, y: number): Ripple[] {
+  const numRipples = 3;  // Number of ripples to create
+  const ripples: Ripple[] = [];
+  
+  for (let i = 0; i < numRipples; i++) {
+    ripples.push({
+      x,
+      y,
+      radius: 0,
+      maxRadius: 150 + i * 50,  // Much larger difference in size between ripples
+      opacity: 0.9 - i * 0.15,  // Less reduction in opacity (was 0.3)
+      speed: 0.8 - i * 0.1,     // Less reduction in speed (was 0.2)
+      delay: i * 60             // Much longer delay between ripples
+    });
+  }
+  
+  return ripples;
+}
+
+function updateRipple(ripple: Ripple): boolean {
+  if (ripple.delay > 0) {
+    ripple.delay--;
+    return true;
+  }
+  
+  ripple.radius += ripple.speed;
+  ripple.opacity = Math.max(0, ripple.opacity - 0.006); // Even slower fade out (was 0.008)
+  return ripple.radius < ripple.maxRadius && ripple.opacity > 0;
+}
+
+function drawRipple(ctx: CanvasRenderingContext2D, ripple: Ripple) {
+  if (ripple.delay > 0) return;
+  
+  ctx.beginPath();
+  ctx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${ripple.opacity})`;
+  
+  // Calculate line width based on opacity (stronger ripples have thicker lines)
+  const lineWidth = 4 * (ripple.opacity / 0.9); // Increased base line width from 3 to 4
+  ctx.lineWidth = lineWidth;
+  
+  ctx.stroke();
+}
+
+function drawFood(ctx: CanvasRenderingContext2D, food: Food) {
+  if (food.eaten) return;
+  
+  ctx.beginPath();
+  ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffd700"; // Gold color for food
+  ctx.fill();
+  
+  // Add a subtle glow effect
+  ctx.shadowColor = "#ffd700";
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
 function animate() {
   // Clear the canvas with a radial gradient from center
   const gradient = ctx.createRadialGradient(
@@ -887,8 +967,47 @@ function animate() {
     drawParticle(ctx, bubbleParticles[i]);
   }
 
-  // Update keyboard movement
-  updateKeyboardMovement();
+  // Update and draw ripples
+  ripples = ripples.filter(ripple => {
+    const isActive = updateRipple(ripple);
+    if (isActive) {
+      drawRipple(ctx, ripple);
+    }
+    return isActive;
+  });
+
+  // Draw all food
+  for (const food of foods) {
+    drawFood(ctx, food);
+  }
+
+  // Find the closest uneaten food
+  let closestFood: Food | null = null;
+  let closestDistance = Infinity;
+  
+  for (const food of foods) {
+    if (food.eaten) continue;
+    
+    const dx = food.x - creature[0].x;
+    const dy = food.y - creature[0].y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestFood = food;
+    }
+  }
+
+  // If there's food nearby, move towards it
+  if (closestFood && closestDistance < 300) {
+    target.x = closestFood.x;
+    target.y = closestFood.y;
+    
+    // Check if we're close enough to eat the food
+    if (closestDistance < 20) {
+      closestFood.eaten = true;
+    }
+  }
 
   // Move head towards target
   moveTowardsTarget(creature[0], target, 5);
@@ -974,81 +1093,27 @@ function updateTargetPosition(event: MouseEvent) {
   target.y = event.clientY - rect.top;
 }
 
-// Add keyboard state tracking
-const keys = {
-  up: false,
-  down: false,
-  left: false,
-  right: false
-};
-
-// Add keyboard event listeners
-window.addEventListener('keydown', (event) => {
-  switch (event.key.toLowerCase()) {
-    case 'w':
-    case 'arrowup':
-      keys.up = true;
-      break;
-    case 's':
-    case 'arrowdown':
-      keys.down = true;
-      break;
-    case 'a':
-    case 'arrowleft':
-      keys.left = true;
-      break;
-    case 'd':
-    case 'arrowright':
-      keys.right = true;
-      break;
+// Add click event listener for dropping food
+canvas.addEventListener("click", (event) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  
+  // Create new food
+  foods.push({
+    x,
+    y,
+    size: 8,
+    eaten: false
+  });
+  
+  // Create multiple ripple effects
+  ripples.push(...createRipples(x, y));
+  
+  // Limit the number of food pieces to prevent too many
+  if (foods.length > 5) {
+    foods = foods.filter(food => !food.eaten);
   }
 });
-
-window.addEventListener('keyup', (event) => {
-  switch (event.key.toLowerCase()) {
-    case 'w':
-    case 'arrowup':
-      keys.up = false;
-      break;
-    case 's':
-    case 'arrowdown':
-      keys.down = false;
-      break;
-    case 'a':
-    case 'arrowleft':
-      keys.left = false;
-      break;
-    case 'd':
-    case 'arrowright':
-      keys.right = false;
-      break;
-  }
-});
-
-// Add keyboard movement update function
-function updateKeyboardMovement() {
-  const moveDistance = 250; // Distance to set target point
-  
-  // Calculate the direction vector based on pressed keys
-  let dirX = 0;
-  let dirY = 0;
-  
-  if (keys.up) dirY -= 1;
-  if (keys.down) dirY += 1;
-  if (keys.left) dirX -= 1;
-  if (keys.right) dirX += 1;
-  
-  // If any movement keys are pressed
-  if (dirX !== 0 || dirY !== 0) {
-    // Normalize the direction vector
-    const length = Math.sqrt(dirX * dirX + dirY * dirY);
-    dirX /= length;
-    dirY /= length;
-    
-    // Set target 250px away in that direction
-    target.x = creature[0].x + dirX * moveDistance;
-    target.y = creature[0].y + dirY * moveDistance;
-  }
-}
 
 animate();
