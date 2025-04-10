@@ -28,6 +28,69 @@ type Target = {
   y: number;
 };
 
+// Particle type for underwater background effect
+type Particle = {
+  x: number;
+  y: number;
+  size: number;
+  speedX: number;
+  speedY: number;
+  opacity: number;
+  depth: number; // 0-1 value representing how "deep" the particle is
+};
+
+// Function to create a particle
+function createParticle(canvasWidth: number, canvasHeight: number, depth: number): Particle {
+  return {
+    x: Math.random() * canvasWidth,
+    y: Math.random() * canvasHeight,
+    size: 1 + Math.random() * 3 * (1 - depth), // Larger particles appear closer
+    speedX: (Math.random() - 0.5) * 0.5 * (1 - depth), // Slower movement for deeper particles
+    speedY: (Math.random() - 0.5) * 0.5 * (1 - depth),
+    opacity: 0.1 + Math.random() * 0.3 * (1 - depth), // Less opacity for deeper particles
+    depth: depth
+  };
+}
+
+// Function to update a particle
+function updateParticle(particle: Particle, canvasWidth: number, canvasHeight: number) {
+  // Move the particle
+  particle.x += particle.speedX;
+  particle.y += particle.speedY;
+  
+  // Wrap around the screen
+  if (particle.x < 0) particle.x = canvasWidth;
+  if (particle.x > canvasWidth) particle.x = 0;
+  if (particle.y < 0) particle.y = canvasHeight;
+  if (particle.y > canvasHeight) particle.y = 0;
+}
+
+// Function to draw a particle
+function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle) {
+  ctx.beginPath();
+  ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
+  ctx.fill();
+}
+
+// Function to create multiple particle layers
+function createParticleLayers(canvasWidth: number, canvasHeight: number, numLayers: number, particlesPerLayer: number): Particle[][] {
+  const layers: Particle[][] = [];
+  
+  for (let i = 0; i < numLayers; i++) {
+    const depth = i / (numLayers - 1); // 0 to 1
+    const layer: Particle[] = [];
+    
+    for (let j = 0; j < particlesPerLayer; j++) {
+      layer.push(createParticle(canvasWidth, canvasHeight, depth));
+    }
+    
+    layers.push(layer);
+  }
+  
+  return layers;
+}
+
 function initializeCanvas() {
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d");
@@ -104,36 +167,37 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   const cp2x = endX + Math.cos(creature[dorsalFinEndIndex].angle - angleOffset) * dorsalFinHeight;
   const cp2y = endY + Math.sin(creature[dorsalFinEndIndex].angle - angleOffset) * dorsalFinHeight;
   
+  // Koi fins are more rounded and flowing
   const leftFin: Fin = {
-    width: 126,
-    height: 63,
-    offsetX: -15,
-    offsetY: -45,
-    angle: Math.PI / 3.5
+    width: 140,  // Wider fins
+    height: 70,  // Taller fins
+    offsetX: -18,
+    offsetY: -50,
+    angle: Math.PI / 3.2  // Slightly adjusted angle
   };
 
   const rightFin: Fin = {
-    width: 126,
-    height: 63,
-    offsetX: -15,
-    offsetY: 45,
-    angle: -Math.PI / 3.5
+    width: 140,  // Wider fins
+    height: 70,  // Taller fins
+    offsetX: -18,
+    offsetY: 50,
+    angle: -Math.PI / 3.2  // Slightly adjusted angle
   };
 
   const backLeftFin: Fin = {
-    width: 75.6,
-    height: 37.8,
-    offsetX: -8,
-    offsetY: -25,
-    angle: Math.PI / 3.5
+    width: 85,   // Wider back fins
+    height: 42,  // Taller back fins
+    offsetX: -10,
+    offsetY: -30,
+    angle: Math.PI / 3.2  // Slightly adjusted angle
   };
 
   const backRightFin: Fin = {
-    width: 75.6,
-    height: 37.8,
-    offsetX: -8,
-    offsetY: 25,
-    angle: -Math.PI / 3.5
+    width: 85,   // Wider back fins
+    height: 42,  // Taller back fins
+    offsetX: -10,
+    offsetY: 30,
+    angle: -Math.PI / 3.2  // Slightly adjusted angle
   };
 
   // Draw fins first (so they appear below the fish)
@@ -153,7 +217,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#cc0000"; // Darker red for fins
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   ctx.restore();
 
@@ -172,7 +236,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#cc0000"; // Darker red for fins
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   ctx.restore();
 
@@ -192,7 +256,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#cc0000"; // Darker red for fins
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   ctx.restore();
 
@@ -211,101 +275,184 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#cc0000"; // Darker red for fins
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   ctx.restore();
 
-  // Draw the creature body
+  // Draw the creature body with koi-like shape and colors
   ctx.beginPath();
-  ctx.fillStyle = "#ff0000"; // Bright red for body
+  
+  // Create a gradient for the koi body
+  const bodyGradient = ctx.createLinearGradient(
+    creature[0].x - creature[0].radius * 2,
+    creature[0].y,
+    creature[creature.length - 1].x + creature[creature.length - 1].radius * 2,
+    creature[creature.length - 1].y
+  );
+  
+  // Koi colors - orange-red base with white patches
+  bodyGradient.addColorStop(0, "#ff9d5c");  // Orange-red at head
+  bodyGradient.addColorStop(0.3, "#ff7e5f"); // Deeper orange in middle
+  bodyGradient.addColorStop(0.7, "#ff6b6b"); // Reddish-orange toward tail
+  bodyGradient.addColorStop(1, "#ff5252");   // Bright red at tail
+  
+  ctx.fillStyle = bodyGradient;
 
-  // Start from the left side of the head
+  // Start from the left side of the head - make it more rounded for koi
   ctx.moveTo(
-    creature[0].x + Math.cos(creature[0].angle - Math.PI / 2) * creature[0].radius,
-    creature[0].y + Math.sin(creature[0].angle - Math.PI / 2) * creature[0].radius
+    creature[0].x + Math.cos(creature[0].angle - Math.PI / 2) * creature[0].radius * 0.9,
+    creature[0].y + Math.sin(creature[0].angle - Math.PI / 2) * creature[0].radius * 0.9
   );
 
-  // Head's left intermediate
+  // Head's left intermediate - more rounded
   ctx.lineTo(
-    creature[0].x + Math.cos(creature[0].angle - Math.PI / 4) * creature[0].radius,
-    creature[0].y + Math.sin(creature[0].angle - Math.PI / 4) * creature[0].radius
+    creature[0].x + Math.cos(creature[0].angle - Math.PI / 4) * creature[0].radius * 0.95,
+    creature[0].y + Math.sin(creature[0].angle - Math.PI / 4) * creature[0].radius * 0.95
   );
 
-  // Head's forward point
+  // Head's forward point - less pronounced
   ctx.lineTo(
-    creature[0].x + Math.cos(creature[0].angle) * creature[0].radius,
-    creature[0].y + Math.sin(creature[0].angle) * creature[0].radius
+    creature[0].x + Math.cos(creature[0].angle) * creature[0].radius * 0.6, // Reduced from 0.8
+    creature[0].y + Math.sin(creature[0].angle) * creature[0].radius * 0.6  // Reduced from 0.8
   );
 
-  // Head's right intermediate
+  // Head's right intermediate - more rounded
   ctx.lineTo(
-    creature[0].x + Math.cos(creature[0].angle + Math.PI / 4) * creature[0].radius,
-    creature[0].y + Math.sin(creature[0].angle + Math.PI / 4) * creature[0].radius
+    creature[0].x + Math.cos(creature[0].angle + Math.PI / 4) * creature[0].radius * 0.95,
+    creature[0].y + Math.sin(creature[0].angle + Math.PI / 4) * creature[0].radius * 0.95
   );
 
-  // Head's right side
+  // Head's right side - more rounded
   ctx.lineTo(
-    creature[0].x + Math.cos(creature[0].angle + Math.PI / 2) * creature[0].radius,
-    creature[0].y + Math.sin(creature[0].angle + Math.PI / 2) * creature[0].radius
+    creature[0].x + Math.cos(creature[0].angle + Math.PI / 2) * creature[0].radius * 0.9,
+    creature[0].y + Math.sin(creature[0].angle + Math.PI / 2) * creature[0].radius * 0.9
   );
 
-  // Connect through all body segments
+  // Connect through all body segments - make body more rounded for koi
   for (let i = 1; i < creature.length - 1; i++) {
     const node = creature[i];
-    // Right side
+    // Right side - make body more rounded
     ctx.lineTo(
-      node.x + Math.cos(node.angle + Math.PI / 2) * node.radius,
-      node.y + Math.sin(node.angle + Math.PI / 2) * node.radius
+      node.x + Math.cos(node.angle + Math.PI / 2) * node.radius * 0.95,
+      node.y + Math.sin(node.angle + Math.PI / 2) * node.radius * 0.95
     );
   }
 
-  // Tail's right side
+  // Tail's right side - make it more rounded
   ctx.lineTo(
-    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius,
-    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius * 0.9,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius * 0.9
   );
 
-  // Tail's right intermediate
+  // Tail's right intermediate - more rounded
   ctx.lineTo(
-    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius,
-    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius * 0.8,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius * 0.8
   );
 
-  // Tail's back point
+  // Tail's back point - more rounded
   ctx.lineTo(
-    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius,
-    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius * 0.7,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius * 0.7
   );
 
-  // Tail's left intermediate
+  // Tail's left intermediate - more rounded
   ctx.lineTo(
-    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius,
-    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius * 0.8,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius * 0.8
   );
 
-  // Tail's left side
+  // Tail's left side - more rounded
   ctx.lineTo(
-    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius,
-    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius * 0.9,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius * 0.9
   );
 
-  // Connect back through all body segments
+  // Connect back through all body segments - make body more rounded for koi
   for (let i = creature.length - 2; i > 0; i--) {
     const node = creature[i];
-    // Left side
+    // Left side - make body more rounded
     ctx.lineTo(
-      node.x + Math.cos(node.angle - Math.PI / 2) * node.radius,
-      node.y + Math.sin(node.angle - Math.PI / 2) * node.radius
+      node.x + Math.cos(node.angle - Math.PI / 2) * node.radius * 0.95,
+      node.y + Math.sin(node.angle - Math.PI / 2) * node.radius * 0.95
     );
   }
 
   // Close the path back to the head's left side
   ctx.closePath();
   ctx.fill();
+  
+  // Add a brighter highlight line across the back
+  ctx.save();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.4)"; // Semi-transparent white
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  
+  // Start from the third node
+  const startNodeIndex = 2;
+  const endNodeIndex = creature.length - 3;
+  
+  // Draw a smooth curve along the back
+  ctx.moveTo(
+    creature[startNodeIndex].x + Math.cos(creature[startNodeIndex].angle) * creature[startNodeIndex].radius * 0.5,
+    creature[startNodeIndex].y + Math.sin(creature[startNodeIndex].angle) * creature[startNodeIndex].radius * 0.5
+  );
+  
+  // Use quadratic curves to create a smooth line
+  for (let i = startNodeIndex + 1; i <= endNodeIndex; i++) {
+    const node = creature[i];
+    const prevNode = creature[i - 1];
+    
+    // Calculate control point between nodes
+    const controlX = (node.x + prevNode.x) / 2;
+    const controlY = (node.y + prevNode.y) / 2;
+    
+    // Calculate point on the back
+    const pointX = node.x + Math.cos(node.angle) * node.radius * 0.5;
+    const pointY = node.y + Math.sin(node.angle) * node.radius * 0.5;
+    
+    ctx.quadraticCurveTo(controlX, controlY, pointX, pointY);
+  }
+  
+  ctx.stroke();
+  ctx.restore();
+  
+  // Add koi patterns (spots) to the body
+  ctx.save();
+  ctx.globalAlpha = 0.7; // Semi-transparent spots
+  
+  // Draw several spots on the body with fixed positions
+  const bodySpotPositions = [
+    { offset: 0.3, size: 6 },
+    { offset: 0.5, size: 7 },
+    { offset: 0.7, size: 5 },
+    { offset: 0.9, size: 8 }
+  ];
+  
+  for (let i = 2; i < creature.length - 3; i += 3) {
+    const node = creature[i];
+    const spotIndex = Math.floor((i - 2) / 3) % bodySpotPositions.length;
+    const { offset, size } = bodySpotPositions[spotIndex];
+    
+    // Fixed position on the body
+    const spotAngle = node.angle + Math.PI / 4;
+    const spotDistance = node.radius * offset;
+    
+    const spotX = node.x + Math.cos(spotAngle) * spotDistance;
+    const spotY = node.y + Math.sin(spotAngle) * spotDistance;
+    
+    // Draw the spot
+    ctx.beginPath();
+    ctx.arc(spotX, spotY, size, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff9d5c"; // Orange spots
+    ctx.fill();
+  }
+  
+  ctx.restore();
 
   // Draw dorsal fin AFTER the body (so it appears on top)
   ctx.save();
-  ctx.strokeStyle = "#990000"; // Darker red for better contrast
+  ctx.strokeStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.lineWidth = 5; // Increased line width for better visibility
   
   // Draw the dorsal fin with two points and Bezier curves
@@ -320,9 +467,34 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
   ctx.lineTo(endX, endY);
   ctx.lineTo(startX, startY);
-  ctx.fillStyle = "#cc0000"; // Fill with red color
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   
+  // Add orange spots to the dorsal fin with fixed positions
+  ctx.save();
+  ctx.globalAlpha = 0.8; // Slightly more opaque spots on the fin
+  
+  // Fixed positions for dorsal fin spots
+  const finSpotPositions = [
+    { t: 0.3, size: 4 },
+    { t: 0.6, size: 3 }
+  ];
+  
+  // Draw spots on the dorsal fin
+  for (const { t, size } of finSpotPositions) {
+    // Calculate position along the Bezier curve
+    const mt = 1 - t;
+    const x = mt * mt * startX + 2 * mt * t * cp1x + t * t * endX;
+    const y = mt * mt * startY + 2 * mt * t * cp1y + t * t * endY;
+    
+    // Draw the spot
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fillStyle = "#ff9d5c"; // Orange spots
+    ctx.fill();
+  }
+  
+  ctx.restore();
   ctx.restore();
 
   // Draw tail fin that responds to curvature
@@ -339,7 +511,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   const tailEndY = tailStartY - Math.sin(tailTipAngle) * tailExtension;
   
   // Tail fin height is also based on curvature but can be larger than dorsal fin
-  const tailFinHeight = 40 + normalizedCurvature * 80; // Increased from 30+60 to 40+80 for a bigger fin
+  const tailFinHeight = 45 + normalizedCurvature * 90; // Increased for koi's flowing tail
   
   // For tail fin, we want to curve in the opposite direction of the fish's curvature
   // This makes the tail fin act like a rudder
@@ -364,7 +536,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   
   // Draw the tail fin
   ctx.save();
-  ctx.strokeStyle = "#990000";
+  ctx.strokeStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.lineWidth = 5;
   
   // Draw the tail fin outline with a more complex shape
@@ -383,13 +555,13 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.moveTo(tailStartX, tailStartY);
   ctx.bezierCurveTo(tailCp1x, tailCp1y, tailCp2x, tailCp2y, tailEndX, tailEndY);
   ctx.lineTo(tailStartX, tailStartY);
-  ctx.fillStyle = "#cc0000";
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   
   // Add a side view of the tail fin that's much more pronounced based on curvature
   // This creates a more visible side profile when the fish is curving
-  const sideViewHeight = 60 + normalizedCurvature * 120; // Much taller side view
-  const sideViewWidth = 30 + normalizedCurvature * 60; // Wider side view
+  const sideViewHeight = 70 + normalizedCurvature * 140; // Much taller side view for koi
+  const sideViewWidth = 35 + normalizedCurvature * 70; // Wider side view for koi
   
   // Calculate the side view points - positioned perpendicular to the tail's direction
   const sideViewAngle = tailTipAngle - Math.PI/2; // Perpendicular to tail direction
@@ -427,7 +599,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.lineTo(tailStartX, tailStartY);
   ctx.lineTo(sideViewStartX, sideViewStartY);
   
-  ctx.strokeStyle = "#990000";
+  ctx.strokeStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.lineWidth = 5;
   ctx.stroke();
   
@@ -438,13 +610,13 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.lineTo(tailEndX, tailEndY);
   ctx.lineTo(tailStartX, tailStartY);
   ctx.lineTo(sideViewStartX, sideViewStartY);
-  ctx.fillStyle = "#cc0000";
+  ctx.fillStyle = "#ff6b6b"; // Lighter red for koi fins
   ctx.fill();
   
   // Add a subtle gradient to the tail fin for a more natural look
   const gradient = ctx.createLinearGradient(tailStartX, tailStartY, tailEndX, tailEndY);
-  gradient.addColorStop(0, "#cc0000");
-  gradient.addColorStop(1, "#990000");
+  gradient.addColorStop(0, "#ff6b6b"); // Lighter red for koi fins
+  gradient.addColorStop(1, "#ff5252"); // Brighter red at the tip
   
   // Apply the gradient to the tail fin
   ctx.beginPath();
@@ -456,17 +628,17 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   
   ctx.restore();
 
-  // Draw eyes
+  // Draw eyes - koi have more expressive eyes
   const leftEye: Eye = {
-    radius: 12,
-    offsetX: -15,
-    offsetY: -25
+    radius: 14, // Larger eyes
+    offsetX: -18,
+    offsetY: -28
   };
 
   const rightEye: Eye = {
-    radius: 12,
-    offsetX: -15,
-    offsetY: 25
+    radius: 14, // Larger eyes
+    offsetX: -18,
+    offsetY: 28
   };
 
   // Draw left eye
@@ -474,15 +646,65 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.fillStyle = "#FFFFFF";
   const leftEyeX = creature[0].x + Math.cos(creature[0].angle) * leftEye.offsetX - Math.sin(creature[0].angle) * leftEye.offsetY;
   const leftEyeY = creature[0].y + Math.sin(creature[0].angle) * leftEye.offsetX + Math.cos(creature[0].angle) * leftEye.offsetY;
-  ctx.arc(leftEyeX, leftEyeY, leftEye.radius, 0, Math.PI * 2);
+  // Draw elliptical eye for foreshortening effect
+  ctx.ellipse(leftEyeX, leftEyeY, leftEye.radius, leftEye.radius * 0.6, creature[0].angle, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw left eye pupil
+  ctx.beginPath();
+  ctx.fillStyle = "#000000";
+  ctx.ellipse(leftEyeX, leftEyeY, leftEye.radius * 0.5, leftEye.radius * 0.3, creature[0].angle, 0, Math.PI * 2);
   ctx.fill();
 
   // Draw right eye
   ctx.beginPath();
+  ctx.fillStyle = "#FFFFFF";
   const rightEyeX = creature[0].x + Math.cos(creature[0].angle) * rightEye.offsetX - Math.sin(creature[0].angle) * rightEye.offsetY;
   const rightEyeY = creature[0].y + Math.sin(creature[0].angle) * rightEye.offsetX + Math.cos(creature[0].angle) * rightEye.offsetY;
-  ctx.arc(rightEyeX, rightEyeY, rightEye.radius, 0, Math.PI * 2);
+  // Draw elliptical eye for foreshortening effect
+  ctx.ellipse(rightEyeX, rightEyeY, rightEye.radius, rightEye.radius * 0.6, creature[0].angle, 0, Math.PI * 2);
   ctx.fill();
+  
+  // Draw right eye pupil
+  ctx.beginPath();
+  ctx.fillStyle = "#000000";
+  ctx.ellipse(rightEyeX, rightEyeY, rightEye.radius * 0.5, rightEye.radius * 0.3, creature[0].angle, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw koi whiskers (barbels)
+  ctx.save();
+  ctx.strokeStyle = "#ff9d5c";
+  ctx.lineWidth = 2; // Keeping them thin
+  
+  // Left whiskers - positioned even more forward at the mouth
+  const leftWhiskerX = creature[0].x + Math.cos(creature[0].angle) * (-5) - Math.sin(creature[0].angle) * (-12);
+  const leftWhiskerY = creature[0].y + Math.sin(creature[0].angle) * (-5) + Math.cos(creature[0].angle) * (-12);
+  
+  ctx.beginPath();
+  ctx.moveTo(leftWhiskerX, leftWhiskerY);
+  ctx.quadraticCurveTo(
+    leftWhiskerX + Math.cos(creature[0].angle - Math.PI/4) * 35,
+    leftWhiskerY + Math.sin(creature[0].angle - Math.PI/4) * 35,
+    leftWhiskerX + Math.cos(creature[0].angle - Math.PI/3) * 55,
+    leftWhiskerY + Math.sin(creature[0].angle - Math.PI/3) * 55
+  );
+  ctx.stroke();
+  
+  // Right whiskers - positioned even more forward at the mouth
+  const rightWhiskerX = creature[0].x + Math.cos(creature[0].angle) * (-5) - Math.sin(creature[0].angle) * 12;
+  const rightWhiskerY = creature[0].y + Math.sin(creature[0].angle) * (-5) + Math.cos(creature[0].angle) * 12;
+  
+  ctx.beginPath();
+  ctx.moveTo(rightWhiskerX, rightWhiskerY);
+  ctx.quadraticCurveTo(
+    rightWhiskerX + Math.cos(creature[0].angle + Math.PI/4) * 35,
+    rightWhiskerY + Math.sin(creature[0].angle + Math.PI/4) * 35,
+    rightWhiskerX + Math.cos(creature[0].angle + Math.PI/3) * 55,
+    rightWhiskerY + Math.sin(creature[0].angle + Math.PI/3) * 55
+  );
+  ctx.stroke();
+  
+  ctx.restore();
 }
 
 function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
@@ -602,6 +824,236 @@ function generateCreatureNodes(
   return nodes;
 }
 
+// Function to draw light rays for top-down view with animation
+function drawLightRays(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, time: number) {
+  // For top-down view, create a more subtle, scattered light pattern
+  const numLightSpots = 8;
+  
+  for (let i = 0; i < numLightSpots; i++) {
+    // Position light spots across the canvas
+    const x = (canvasWidth * (i / numLightSpots)) + Math.sin(time * 0.0005 + i) * 20;
+    const y = (canvasHeight * (i / numLightSpots)) + Math.cos(time * 0.0007 + i) * 20;
+    
+    // Create a subtle light spot
+    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 100);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, 100, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Function to create a bubble particle
+function createBubbleParticle(canvasWidth: number, canvasHeight: number): Particle {
+  return {
+    x: Math.random() * canvasWidth,
+    y: Math.random() * canvasHeight, // For top-down view, bubbles can appear anywhere
+    size: 2 + Math.random() * 4,
+    speedX: (Math.random() - 0.5) * 0.5,
+    speedY: (Math.random() - 0.5) * 0.5, // For top-down view, bubbles can move in any direction
+    opacity: 0.3 + Math.random() * 0.4,
+    depth: Math.random() * 0.5 // Bubbles are always in the foreground
+  };
+}
+
+// Function to update a bubble particle
+function updateBubbleParticle(particle: Particle, canvasWidth: number, canvasHeight: number) {
+  // Move the particle
+  particle.x += particle.speedX;
+  particle.y += particle.speedY;
+  
+  // Wrap around the screen
+  if (particle.x < 0) particle.x = canvasWidth;
+  if (particle.x > canvasWidth) particle.x = 0;
+  if (particle.y < 0) particle.y = canvasHeight;
+  if (particle.y > canvasHeight) particle.y = 0;
+}
+
+// Function to create bubble particles
+function createBubbleParticles(canvasWidth: number, canvasHeight: number, count: number): Particle[] {
+  const bubbles: Particle[] = [];
+  
+  for (let i = 0; i < count; i++) {
+    bubbles.push(createBubbleParticle(canvasWidth, canvasHeight));
+  }
+  
+  return bubbles;
+}
+
+// Function to create a caustics pattern for top-down view
+function createCausticsPattern(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
+  // Create an off-screen canvas for the caustics pattern
+  const causticsCanvas = document.createElement('canvas');
+  causticsCanvas.width = canvasWidth;
+  causticsCanvas.height = canvasHeight;
+  const causticsCtx = causticsCanvas.getContext('2d');
+  if (!causticsCtx) throw new Error("Failed to get 2d context for caustics canvas");
+  
+  // Fill with a very subtle blue-green color
+  causticsCtx.fillStyle = 'rgba(0, 50, 100, 0.1)';
+  causticsCtx.fillRect(0, 0, canvasWidth, canvasHeight);
+  
+  // Draw some organic shapes to simulate caustics
+  const numShapes = 20;
+  for (let i = 0; i < numShapes; i++) {
+    const x = Math.random() * canvasWidth;
+    const y = Math.random() * canvasHeight;
+    const size = 30 + Math.random() * 80;
+    
+    // Create a gradient for each shape
+    const gradient = causticsCtx.createRadialGradient(x, y, 0, x, y, size);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    causticsCtx.fillStyle = gradient;
+    
+    // Draw an organic shape - more circular for top-down view
+    causticsCtx.beginPath();
+    const numPoints = 12; // More points for smoother circles
+    for (let j = 0; j < numPoints; j++) {
+      const angle = (j / numPoints) * Math.PI * 2;
+      const radius = size * (0.8 + Math.random() * 0.4);
+      const px = x + Math.cos(angle) * radius;
+      const py = y + Math.sin(angle) * radius;
+      
+      if (j === 0) {
+        causticsCtx.moveTo(px, py);
+      } else {
+        causticsCtx.lineTo(px, py);
+      }
+    }
+    causticsCtx.closePath();
+    causticsCtx.fill();
+  }
+  
+  return causticsCanvas;
+}
+
+// Function to update the caustics pattern for top-down view
+function updateCausticsPattern(causticsPattern: HTMLCanvasElement, time: number) {
+  const causticsCtx = causticsPattern.getContext('2d');
+  if (!causticsCtx) return;
+  
+  // Clear the canvas
+  causticsCtx.clearRect(0, 0, causticsPattern.width, causticsPattern.height);
+  
+  // Fill with a very subtle blue-green color
+  causticsCtx.fillStyle = 'rgba(0, 50, 100, 0.1)';
+  causticsCtx.fillRect(0, 0, causticsPattern.width, causticsPattern.height);
+  
+  // Draw some organic shapes to simulate caustics with animation
+  const numShapes = 20;
+  for (let i = 0; i < numShapes; i++) {
+    // Use the time parameter to create a subtle movement
+    const offsetX = Math.sin(time * 0.0005 + i * 0.5) * 30;
+    const offsetY = Math.cos(time * 0.0007 + i * 0.3) * 30;
+    
+    const x = (causticsPattern.width * (i / numShapes)) + offsetX;
+    const y = (causticsPattern.height * (i / numShapes)) + offsetY;
+    const size = 30 + Math.random() * 80;
+    
+    // Create a gradient for each shape
+    const gradient = causticsCtx.createRadialGradient(x, y, 0, x, y, size);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    causticsCtx.fillStyle = gradient;
+    
+    // Draw an organic shape - more circular for top-down view
+    causticsCtx.beginPath();
+    const numPoints = 12; // More points for smoother circles
+    for (let j = 0; j < numPoints; j++) {
+      const angle = (j / numPoints) * Math.PI * 2 + time * 0.0002; // Slower rotation
+      const radius = size * (0.8 + Math.random() * 0.4);
+      const px = x + Math.cos(angle) * radius;
+      const py = y + Math.sin(angle) * radius;
+      
+      if (j === 0) {
+        causticsCtx.moveTo(px, py);
+      } else {
+        causticsCtx.lineTo(px, py);
+      }
+    }
+    causticsCtx.closePath();
+    causticsCtx.fill();
+  }
+}
+
+// Function to apply caustics effect
+function applyCausticsEffect(ctx: CanvasRenderingContext2D, causticsPattern: HTMLCanvasElement, canvasWidth: number, canvasHeight: number) {
+  // Save the current context state
+  ctx.save();
+  
+  // Set the blend mode to overlay for a light effect
+  ctx.globalCompositeOperation = 'overlay';
+  
+  // Draw the caustics pattern
+  ctx.drawImage(causticsPattern, 0, 0, canvasWidth, canvasHeight);
+  
+  // Restore the context state
+  ctx.restore();
+}
+
+function animate() {
+  // Clear the canvas with a deeper blue color for underwater effect
+  ctx.fillStyle = "#0a2a4a";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Get current time for animations
+  const currentTime = Date.now();
+  
+  // Draw light rays with animation
+  drawLightRays(ctx, canvas.width, canvas.height, currentTime);
+  
+  // Update and apply caustics effect
+  updateCausticsPattern(causticsPattern, currentTime);
+  applyCausticsEffect(ctx, causticsPattern, canvas.width, canvas.height);
+
+  // Update and draw particles
+  for (let layerIndex = 0; layerIndex < particleLayers.length; layerIndex++) {
+    const layer = particleLayers[layerIndex];
+    
+    for (let i = 0; i < layer.length; i++) {
+      updateParticle(layer[i], canvas.width, canvas.height);
+      drawParticle(ctx, layer[i]);
+    }
+  }
+  
+  // Update and draw bubbles
+  for (let i = 0; i < bubbleParticles.length; i++) {
+    updateBubbleParticle(bubbleParticles[i], canvas.width, canvas.height);
+    drawParticle(ctx, bubbleParticles[i]);
+  }
+
+  // Update keyboard movement
+  updateKeyboardMovement();
+
+  // Move head towards target
+  moveTowardsTarget(creature[0], target, 5);
+
+  // Update follower nodes to maintain distance from their leaders
+  for (let i = 1; i < creature.length; i++) {
+    updateFollowerNode(creature[i], creature[i - 1], NODE_SPACING);
+  }
+
+  // Draw the creature
+  drawCreature(ctx, creature);
+
+  // Apply pixelation effect
+  pixelCtx.imageSmoothingEnabled = false;
+  pixelCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8);
+  pixelCtx.drawImage(pixelCanvas, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8, 0, 0, pixelCanvas.width, pixelCanvas.height);
+
+  // Request next frame
+  requestAnimationFrame(animate);
+}
+
 // Initialize and start animation
 const { canvas, ctx, pixelCanvas, pixelCtx } = initializeCanvas();
 
@@ -610,15 +1062,24 @@ const creature = generateCreatureNodes(
   canvas.width / 2,
   canvas.height / 2,
   [
-    45, 48, 50, 56, 56, 54, 54, 51, 48, 45, 42, 41, 40, 38, 33, 30, 27, 24, 21, 18,
+    45, 48, 50, 52, 54, 54, 51, 48, 45, 42, 41, 40, 38, 33, 30, 27, 24, 21, 18,
     15, 10, 8
-  ] // Custom radius values for each node
+  ]
 );
 
 const target: Target = {
   x: canvas.width / 2,
   y: canvas.height / 2,
 };
+
+// Create particle layers for underwater effect
+const particleLayers = createParticleLayers(canvas.width, canvas.height, 5, 50);
+
+// Create bubble particles
+const bubbleParticles = createBubbleParticles(canvas.width, canvas.height, 30);
+
+// Create caustics pattern
+const causticsPattern = createCausticsPattern(ctx, canvas.width, canvas.height);
 
 // Add the pixel canvas to the DOM
 document.body.appendChild(pixelCanvas);
@@ -735,34 +1196,6 @@ function updateKeyboardMovement() {
     target.x = creature[0].x + dirX * moveDistance;
     target.y = creature[0].y + dirY * moveDistance;
   }
-}
-
-function animate() {
-  // Clear the canvas
-  ctx.fillStyle = "#a8d5ff";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Update keyboard movement
-  updateKeyboardMovement();
-
-  // Move head towards target
-  moveTowardsTarget(creature[0], target, 5);
-
-  // Update follower nodes to maintain distance from their leaders
-  for (let i = 1; i < creature.length; i++) {
-    updateFollowerNode(creature[i], creature[i - 1], NODE_SPACING);
-  }
-
-  // Draw the creature
-  drawCreature(ctx, creature);
-
-  // Apply pixelation effect
-  pixelCtx.imageSmoothingEnabled = false;
-  pixelCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8);
-  pixelCtx.drawImage(pixelCanvas, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8, 0, 0, pixelCanvas.width, pixelCanvas.height);
-
-  // Request next frame
-  requestAnimationFrame(animate);
 }
 
 animate();
