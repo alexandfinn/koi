@@ -64,97 +64,7 @@ function initializeCanvas() {
 }
 
 function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
-  // Draw the creature body
-  ctx.beginPath();
-  ctx.fillStyle = "#ff0000"; // Bright red for fill
-
-  // Start from the left side of the head
-  const head = creature[0];
-  ctx.moveTo(
-    head.x + Math.cos(head.angle - Math.PI / 2) * head.radius,
-    head.y + Math.sin(head.angle - Math.PI / 2) * head.radius
-  );
-
-  // Head's left intermediate
-  ctx.lineTo(
-    head.x + Math.cos(head.angle - Math.PI / 4) * head.radius,
-    head.y + Math.sin(head.angle - Math.PI / 4) * head.radius
-  );
-
-  // Head's forward point
-  ctx.lineTo(
-    head.x + Math.cos(head.angle) * head.radius,
-    head.y + Math.sin(head.angle) * head.radius
-  );
-
-  // Head's right intermediate
-  ctx.lineTo(
-    head.x + Math.cos(head.angle + Math.PI / 4) * head.radius,
-    head.y + Math.sin(head.angle + Math.PI / 4) * head.radius
-  );
-
-  // Head's right side
-  ctx.lineTo(
-    head.x + Math.cos(head.angle + Math.PI / 2) * head.radius,
-    head.y + Math.sin(head.angle + Math.PI / 2) * head.radius
-  );
-
-  // Connect through all body segments
-  for (let i = 1; i < creature.length - 1; i++) {
-    const node = creature[i];
-    // Right side
-    ctx.lineTo(
-      node.x + Math.cos(node.angle + Math.PI / 2) * node.radius,
-      node.y + Math.sin(node.angle + Math.PI / 2) * node.radius
-    );
-  }
-
-  // Tail's right side
-  const tail = creature[creature.length - 1];
-  ctx.lineTo(
-    tail.x + Math.cos(tail.angle + Math.PI / 2) * tail.radius,
-    tail.y + Math.sin(tail.angle + Math.PI / 2) * tail.radius
-  );
-
-  // Tail's right intermediate
-  ctx.lineTo(
-    tail.x + Math.cos(tail.angle + (3 * Math.PI) / 4) * tail.radius,
-    tail.y + Math.sin(tail.angle + (3 * Math.PI) / 4) * tail.radius
-  );
-
-  // Tail's back point
-  ctx.lineTo(
-    tail.x + Math.cos(tail.angle + Math.PI) * tail.radius,
-    tail.y + Math.sin(tail.angle + Math.PI) * tail.radius
-  );
-
-  // Tail's left intermediate
-  ctx.lineTo(
-    tail.x + Math.cos(tail.angle - (3 * Math.PI) / 4) * tail.radius,
-    tail.y + Math.sin(tail.angle - (3 * Math.PI) / 4) * tail.radius
-  );
-
-  // Tail's left side
-  ctx.lineTo(
-    tail.x + Math.cos(tail.angle - Math.PI / 2) * tail.radius,
-    tail.y + Math.sin(tail.angle - Math.PI / 2) * tail.radius
-  );
-
-  // Connect back through all body segments
-  for (let i = creature.length - 2; i > 0; i--) {
-    const node = creature[i];
-    // Left side
-    ctx.lineTo(
-      node.x + Math.cos(node.angle - Math.PI / 2) * node.radius,
-      node.y + Math.sin(node.angle - Math.PI / 2) * node.radius
-    );
-  }
-
-  // Close the path back to the head's left side
-  ctx.closePath();
-  ctx.fill();
-
-  // Draw fins
+  // Define fin positions and properties
   const firstFinNodeIndex = Math.floor(creature.length / 3);
   const secondFinNodeIndex = Math.floor(creature.length * 2 / 3);
   const firstFinNode = creature[firstFinNodeIndex];
@@ -179,26 +89,28 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   };
 
   const backLeftFin: Fin = {
-    width: 63,
-    height: 31.5,
-    offsetX: -15,
-    offsetY: -45,
+    width: 75.6,
+    height: 37.8,
+    offsetX: -8,
+    offsetY: -25,
     angle: Math.PI / 3.5
   };
 
   const backRightFin: Fin = {
-    width: 63,
-    height: 31.5,
-    offsetX: -15,
-    offsetY: 45,
+    width: 75.6,
+    height: 37.8,
+    offsetX: -8,
+    offsetY: 25,
     angle: -Math.PI / 3.5
   };
 
-  // Draw first set of fins
+  // Draw fins first (so they appear below the fish)
+  // First set of fins
   // Left fin
   ctx.save();
   ctx.translate(firstFinNode.x, firstFinNode.y);
-  ctx.rotate(firstFinNode.angle + leftFin.angle + (firstFinNode.angle - firstPredNode.angle) * 0.5);
+  const firstFinAngle = firstFinNode.angle + leftFin.angle - (firstFinNode.angle - firstPredNode.angle) * 2.5; // Negated the angle difference
+  ctx.rotate(firstFinAngle);
   ctx.beginPath();
   ctx.ellipse(
     leftFin.offsetX,
@@ -209,14 +121,15 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#ff0000";
+  ctx.fillStyle = "#cc0000"; // Darker red for fins
   ctx.fill();
   ctx.restore();
 
   // Right fin
   ctx.save();
   ctx.translate(firstFinNode.x, firstFinNode.y);
-  ctx.rotate(firstFinNode.angle + rightFin.angle + (firstFinNode.angle - firstPredNode.angle) * 0.5);
+  const firstRightFinAngle = firstFinNode.angle + rightFin.angle - (firstFinNode.angle - firstPredNode.angle) * 2.5; // Negated the angle difference
+  ctx.rotate(firstRightFinAngle);
   ctx.beginPath();
   ctx.ellipse(
     rightFin.offsetX,
@@ -227,15 +140,16 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#ff0000";
+  ctx.fillStyle = "#cc0000"; // Darker red for fins
   ctx.fill();
   ctx.restore();
 
-  // Draw second set of fins
+  // Second set of fins
   // Left fin
   ctx.save();
   ctx.translate(secondFinNode.x, secondFinNode.y);
-  ctx.rotate(secondFinNode.angle + backLeftFin.angle + (secondFinNode.angle - secondPredNode.angle) * 0.5);
+  const secondFinAngle = secondFinNode.angle + backLeftFin.angle - (secondFinNode.angle - secondPredNode.angle) * 2.5; // Negated the angle difference
+  ctx.rotate(secondFinAngle);
   ctx.beginPath();
   ctx.ellipse(
     backLeftFin.offsetX,
@@ -246,14 +160,15 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#ff0000";
+  ctx.fillStyle = "#cc0000"; // Darker red for fins
   ctx.fill();
   ctx.restore();
 
   // Right fin
   ctx.save();
   ctx.translate(secondFinNode.x, secondFinNode.y);
-  ctx.rotate(secondFinNode.angle + backRightFin.angle + (secondFinNode.angle - secondPredNode.angle) * 0.5);
+  const secondRightFinAngle = secondFinNode.angle + backRightFin.angle - (secondFinNode.angle - secondPredNode.angle) * 2.5; // Negated the angle difference
+  ctx.rotate(secondRightFinAngle);
   ctx.beginPath();
   ctx.ellipse(
     backRightFin.offsetX,
@@ -264,9 +179,97 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
     0,
     Math.PI * 2
   );
-  ctx.fillStyle = "#ff0000";
+  ctx.fillStyle = "#cc0000"; // Darker red for fins
   ctx.fill();
   ctx.restore();
+
+  // Draw the creature body
+  ctx.beginPath();
+  ctx.fillStyle = "#ff0000"; // Bright red for body
+
+  // Start from the left side of the head
+  ctx.moveTo(
+    creature[0].x + Math.cos(creature[0].angle - Math.PI / 2) * creature[0].radius,
+    creature[0].y + Math.sin(creature[0].angle - Math.PI / 2) * creature[0].radius
+  );
+
+  // Head's left intermediate
+  ctx.lineTo(
+    creature[0].x + Math.cos(creature[0].angle - Math.PI / 4) * creature[0].radius,
+    creature[0].y + Math.sin(creature[0].angle - Math.PI / 4) * creature[0].radius
+  );
+
+  // Head's forward point
+  ctx.lineTo(
+    creature[0].x + Math.cos(creature[0].angle) * creature[0].radius,
+    creature[0].y + Math.sin(creature[0].angle) * creature[0].radius
+  );
+
+  // Head's right intermediate
+  ctx.lineTo(
+    creature[0].x + Math.cos(creature[0].angle + Math.PI / 4) * creature[0].radius,
+    creature[0].y + Math.sin(creature[0].angle + Math.PI / 4) * creature[0].radius
+  );
+
+  // Head's right side
+  ctx.lineTo(
+    creature[0].x + Math.cos(creature[0].angle + Math.PI / 2) * creature[0].radius,
+    creature[0].y + Math.sin(creature[0].angle + Math.PI / 2) * creature[0].radius
+  );
+
+  // Connect through all body segments
+  for (let i = 1; i < creature.length - 1; i++) {
+    const node = creature[i];
+    // Right side
+    ctx.lineTo(
+      node.x + Math.cos(node.angle + Math.PI / 2) * node.radius,
+      node.y + Math.sin(node.angle + Math.PI / 2) * node.radius
+    );
+  }
+
+  // Tail's right side
+  ctx.lineTo(
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI / 2) * creature[creature.length - 1].radius
+  );
+
+  // Tail's right intermediate
+  ctx.lineTo(
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + (3 * Math.PI) / 4) * creature[creature.length - 1].radius
+  );
+
+  // Tail's back point
+  ctx.lineTo(
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle + Math.PI) * creature[creature.length - 1].radius
+  );
+
+  // Tail's left intermediate
+  ctx.lineTo(
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - (3 * Math.PI) / 4) * creature[creature.length - 1].radius
+  );
+
+  // Tail's left side
+  ctx.lineTo(
+    creature[creature.length - 1].x + Math.cos(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius,
+    creature[creature.length - 1].y + Math.sin(creature[creature.length - 1].angle - Math.PI / 2) * creature[creature.length - 1].radius
+  );
+
+  // Connect back through all body segments
+  for (let i = creature.length - 2; i > 0; i--) {
+    const node = creature[i];
+    // Left side
+    ctx.lineTo(
+      node.x + Math.cos(node.angle - Math.PI / 2) * node.radius,
+      node.y + Math.sin(node.angle - Math.PI / 2) * node.radius
+    );
+  }
+
+  // Close the path back to the head's left side
+  ctx.closePath();
+  ctx.fill();
 
   // Draw eyes
   const leftEye: Eye = {
@@ -284,15 +287,15 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   // Draw left eye
   ctx.beginPath();
   ctx.fillStyle = "#FFFFFF";
-  const leftEyeX = head.x + Math.cos(head.angle) * leftEye.offsetX - Math.sin(head.angle) * leftEye.offsetY;
-  const leftEyeY = head.y + Math.sin(head.angle) * leftEye.offsetX + Math.cos(head.angle) * leftEye.offsetY;
+  const leftEyeX = creature[0].x + Math.cos(creature[0].angle) * leftEye.offsetX - Math.sin(creature[0].angle) * leftEye.offsetY;
+  const leftEyeY = creature[0].y + Math.sin(creature[0].angle) * leftEye.offsetX + Math.cos(creature[0].angle) * leftEye.offsetY;
   ctx.arc(leftEyeX, leftEyeY, leftEye.radius, 0, Math.PI * 2);
   ctx.fill();
 
   // Draw right eye
   ctx.beginPath();
-  const rightEyeX = head.x + Math.cos(head.angle) * rightEye.offsetX - Math.sin(head.angle) * rightEye.offsetY;
-  const rightEyeY = head.y + Math.sin(head.angle) * rightEye.offsetX + Math.cos(head.angle) * rightEye.offsetY;
+  const rightEyeX = creature[0].x + Math.cos(creature[0].angle) * rightEye.offsetX - Math.sin(creature[0].angle) * rightEye.offsetY;
+  const rightEyeY = creature[0].y + Math.sin(creature[0].angle) * rightEye.offsetX + Math.cos(creature[0].angle) * rightEye.offsetY;
   ctx.arc(rightEyeX, rightEyeY, rightEye.radius, 0, Math.PI * 2);
   ctx.fill();
 }
@@ -324,10 +327,17 @@ function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
     const easingFactor = Math.min(1, Math.min(distance / 100, distance / 20));
     const currentSpeed = speed * easingFactor;
     
-    // Add oscillation to head angle while moving, but only when far from target
-    const maxOscillation = 0.07;
+    // Add oscillation to head angle while moving
+    // Use a combination of sine waves for more natural oscillation
+    const maxOscillation = 0.05; 
     const distanceScale = distance < 120 ? 0 : Math.pow(Math.min(1, (distance - 120) / 100), 2);
-    const oscillation = Math.sin(Date.now() * 0.003) * maxOscillation * distanceScale;
+    
+    // Create a more complex oscillation pattern that works in all directions
+    const time = Date.now() * 0.003;
+    const primaryOscillation = Math.sin(time) * maxOscillation;
+    const secondaryOscillation = Math.sin(time * 1.5) * maxOscillation * 0.5;
+    const oscillation = (primaryOscillation + secondaryOscillation) * distanceScale;
+    
     node.angle += oscillation;
     
     // Move in current direction with eased speed
@@ -462,10 +472,90 @@ function updateTargetPosition(event: MouseEvent) {
   target.y = event.clientY - rect.top;
 }
 
+// Add keyboard state tracking
+const keys = {
+  up: false,
+  down: false,
+  left: false,
+  right: false
+};
+
+// Add keyboard event listeners
+window.addEventListener('keydown', (event) => {
+  switch (event.key.toLowerCase()) {
+    case 'w':
+    case 'arrowup':
+      keys.up = true;
+      break;
+    case 's':
+    case 'arrowdown':
+      keys.down = true;
+      break;
+    case 'a':
+    case 'arrowleft':
+      keys.left = true;
+      break;
+    case 'd':
+    case 'arrowright':
+      keys.right = true;
+      break;
+  }
+});
+
+window.addEventListener('keyup', (event) => {
+  switch (event.key.toLowerCase()) {
+    case 'w':
+    case 'arrowup':
+      keys.up = false;
+      break;
+    case 's':
+    case 'arrowdown':
+      keys.down = false;
+      break;
+    case 'a':
+    case 'arrowleft':
+      keys.left = false;
+      break;
+    case 'd':
+    case 'arrowright':
+      keys.right = false;
+      break;
+  }
+});
+
+// Add keyboard movement update function
+function updateKeyboardMovement() {
+  const moveDistance = 250; // Distance to set target point
+  
+  // Calculate the direction vector based on pressed keys
+  let dirX = 0;
+  let dirY = 0;
+  
+  if (keys.up) dirY -= 1;
+  if (keys.down) dirY += 1;
+  if (keys.left) dirX -= 1;
+  if (keys.right) dirX += 1;
+  
+  // If any movement keys are pressed
+  if (dirX !== 0 || dirY !== 0) {
+    // Normalize the direction vector
+    const length = Math.sqrt(dirX * dirX + dirY * dirY);
+    dirX /= length;
+    dirY /= length;
+    
+    // Set target 250px away in that direction
+    target.x = creature[0].x + dirX * moveDistance;
+    target.y = creature[0].y + dirY * moveDistance;
+  }
+}
+
 function animate() {
   // Clear the canvas
   ctx.fillStyle = "#a8d5ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Update keyboard movement
+  updateKeyboardMovement();
 
   // Move head towards target
   moveTowardsTarget(creature[0], target, 5);
