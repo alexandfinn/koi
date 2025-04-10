@@ -72,6 +72,38 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   const firstPredNode = creature[firstFinNodeIndex - 1];
   const secondPredNode = creature[secondFinNodeIndex - 1];
   
+  // Calculate total curvature for dorsal fin
+  let totalCurvature = 0;
+  for (let i = 1; i < creature.length; i++) {
+    const angleDiff = creature[i].angle - creature[i-1].angle;
+    totalCurvature += angleDiff;
+  }
+  
+  // Normalize curvature to a reasonable range for the fin - more subtle
+  const normalizedCurvature = Math.min(1, Math.abs(totalCurvature) / 10); // Reduced sensitivity
+  const dorsalFinHeight = 20 + normalizedCurvature * 40; // Reduced height range for more subtlety
+  
+  // Determine the direction of curvature (positive = curving right, negative = curving left)
+  const curvatureDirection = Math.sign(totalCurvature);
+  
+  // Define dorsal fin points - just two points
+  const dorsalFinStartIndex = Math.floor(creature.length * 0.35); // Start at 35% of the body (moved from 30%)
+  const dorsalFinEndIndex = Math.floor(creature.length * 0.45);   // End at 45% of the body (moved from 50%)
+  
+  const startX = creature[dorsalFinStartIndex].x;
+  const startY = creature[dorsalFinStartIndex].y;
+  const endX = creature[dorsalFinEndIndex].x;
+  const endY = creature[dorsalFinEndIndex].y;
+  
+  // Calculate control points for the Bezier curves
+  // The angle offset is now based on the curvature direction but more subtle
+  const angleOffset = Math.PI/3 * curvatureDirection * normalizedCurvature; // Reduced angle range
+  
+  const cp1x = startX + Math.cos(creature[dorsalFinStartIndex].angle - angleOffset) * dorsalFinHeight;
+  const cp1y = startY + Math.sin(creature[dorsalFinStartIndex].angle - angleOffset) * dorsalFinHeight;
+  const cp2x = endX + Math.cos(creature[dorsalFinEndIndex].angle - angleOffset) * dorsalFinHeight;
+  const cp2y = endY + Math.sin(creature[dorsalFinEndIndex].angle - angleOffset) * dorsalFinHeight;
+  
   const leftFin: Fin = {
     width: 126,
     height: 63,
@@ -109,7 +141,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   // Left fin
   ctx.save();
   ctx.translate(firstFinNode.x, firstFinNode.y);
-  const firstFinAngle = firstFinNode.angle + leftFin.angle - (firstFinNode.angle - firstPredNode.angle) * 2.5; // Negated the angle difference
+  const firstFinAngle = firstFinNode.angle + leftFin.angle - (firstFinNode.angle - firstPredNode.angle) * 3.2;
   ctx.rotate(firstFinAngle);
   ctx.beginPath();
   ctx.ellipse(
@@ -128,7 +160,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   // Right fin
   ctx.save();
   ctx.translate(firstFinNode.x, firstFinNode.y);
-  const firstRightFinAngle = firstFinNode.angle + rightFin.angle - (firstFinNode.angle - firstPredNode.angle) * 2.5; // Negated the angle difference
+  const firstRightFinAngle = firstFinNode.angle + rightFin.angle - (firstFinNode.angle - firstPredNode.angle) * 3.2;
   ctx.rotate(firstRightFinAngle);
   ctx.beginPath();
   ctx.ellipse(
@@ -148,7 +180,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   // Left fin
   ctx.save();
   ctx.translate(secondFinNode.x, secondFinNode.y);
-  const secondFinAngle = secondFinNode.angle + backLeftFin.angle - (secondFinNode.angle - secondPredNode.angle) * 2.5; // Negated the angle difference
+  const secondFinAngle = secondFinNode.angle + backLeftFin.angle - (secondFinNode.angle - secondPredNode.angle) * 3.2;
   ctx.rotate(secondFinAngle);
   ctx.beginPath();
   ctx.ellipse(
@@ -167,7 +199,7 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   // Right fin
   ctx.save();
   ctx.translate(secondFinNode.x, secondFinNode.y);
-  const secondRightFinAngle = secondFinNode.angle + backRightFin.angle - (secondFinNode.angle - secondPredNode.angle) * 2.5; // Negated the angle difference
+  const secondRightFinAngle = secondFinNode.angle + backRightFin.angle - (secondFinNode.angle - secondPredNode.angle) * 3.2;
   ctx.rotate(secondRightFinAngle);
   ctx.beginPath();
   ctx.ellipse(
@@ -271,6 +303,159 @@ function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
   ctx.closePath();
   ctx.fill();
 
+  // Draw dorsal fin AFTER the body (so it appears on top)
+  ctx.save();
+  ctx.strokeStyle = "#990000"; // Darker red for better contrast
+  ctx.lineWidth = 5; // Increased line width for better visibility
+  
+  // Draw the dorsal fin with two points and Bezier curves
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+  ctx.stroke();
+  
+  // Fill the dorsal fin for better visibility
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+  ctx.lineTo(endX, endY);
+  ctx.lineTo(startX, startY);
+  ctx.fillStyle = "#cc0000"; // Fill with red color
+  ctx.fill();
+  
+  ctx.restore();
+
+  // Draw tail fin that responds to curvature
+  const tailFinStartIndex = creature.length - 1; // Last node (tail tip)
+  
+  // Calculate a point behind the tail tip for the tail fin
+  const tailTipAngle = creature[tailFinStartIndex].angle;
+  const tailExtension = 0; // Reduced from 20 to 0 to position the fin 20px closer to the tail
+  
+  // Position the tail fin behind the tail tip
+  const tailStartX = creature[tailFinStartIndex].x - Math.cos(tailTipAngle) * tailExtension;
+  const tailStartY = creature[tailFinStartIndex].y - Math.sin(tailTipAngle) * tailExtension;
+  const tailEndX = tailStartX - Math.cos(tailTipAngle) * tailExtension;
+  const tailEndY = tailStartY - Math.sin(tailTipAngle) * tailExtension;
+  
+  // Tail fin height is also based on curvature but can be larger than dorsal fin
+  const tailFinHeight = 40 + normalizedCurvature * 80; // Increased from 30+60 to 40+80 for a bigger fin
+  
+  // For tail fin, we want to curve in the opposite direction of the fish's curvature
+  // This makes the tail fin act like a rudder
+  // Use a smoother transition function that's more gradual near zero curvature
+  // This creates a more natural movement with less sudden changes
+  const smoothCurvature = (curvature: number) => {
+    // Sigmoid-like function that's more gradual near zero
+    // This creates a smoother transition with less sensitivity to small changes
+    return Math.tanh(curvature * 2) * 0.5;
+  };
+  
+  const tailAngleOffset = -Math.PI/2 * curvatureDirection * smoothCurvature(normalizedCurvature);
+  
+  // Calculate control points for the tail fin Bezier curve
+  // Changed shape to be broader as it extends back
+  const tailCp1x = tailStartX + Math.cos(tailTipAngle - Math.PI + tailAngleOffset) * tailFinHeight;
+  const tailCp1y = tailStartY + Math.sin(tailTipAngle - Math.PI + tailAngleOffset) * tailFinHeight;
+  
+  // Create a broader tail by having the second control point extend further and wider
+  const tailCp2x = tailEndX + Math.cos(tailTipAngle - Math.PI + tailAngleOffset) * (tailFinHeight * 2);
+  const tailCp2y = tailEndY + Math.sin(tailTipAngle - Math.PI + tailAngleOffset) * (tailFinHeight * 2);
+  
+  // Draw the tail fin
+  ctx.save();
+  ctx.strokeStyle = "#990000";
+  ctx.lineWidth = 5;
+  
+  // Draw the tail fin outline with a more complex shape
+  ctx.beginPath();
+  ctx.moveTo(tailStartX, tailStartY);
+  
+  // First curve to create the main body of the tail
+  ctx.bezierCurveTo(tailCp1x, tailCp1y, tailCp2x, tailCp2y, tailEndX, tailEndY);
+  
+  // Remove the notch/fork at the end for a more unified tail fin
+  
+  ctx.stroke();
+  
+  // Fill the tail fin
+  ctx.beginPath();
+  ctx.moveTo(tailStartX, tailStartY);
+  ctx.bezierCurveTo(tailCp1x, tailCp1y, tailCp2x, tailCp2y, tailEndX, tailEndY);
+  ctx.lineTo(tailStartX, tailStartY);
+  ctx.fillStyle = "#cc0000";
+  ctx.fill();
+  
+  // Add a side view of the tail fin that's much more pronounced based on curvature
+  // This creates a more visible side profile when the fish is curving
+  const sideViewHeight = 60 + normalizedCurvature * 120; // Much taller side view
+  const sideViewWidth = 30 + normalizedCurvature * 60; // Wider side view
+  
+  // Calculate the side view points - positioned perpendicular to the tail's direction
+  const sideViewAngle = tailTipAngle - Math.PI/2; // Perpendicular to tail direction
+  
+  // Create a more pronounced side view that's visible when the fish is curving
+  // Use a smoother transition to avoid sudden flips
+  const sideViewStartX = tailStartX + Math.cos(sideViewAngle) * sideViewWidth * smoothCurvature(curvatureDirection * normalizedCurvature);
+  const sideViewStartY = tailStartY + Math.sin(sideViewAngle) * sideViewWidth * smoothCurvature(curvatureDirection * normalizedCurvature);
+  
+  const sideViewEndX = tailEndX + Math.cos(sideViewAngle) * sideViewWidth * smoothCurvature(curvatureDirection * normalizedCurvature);
+  const sideViewEndY = tailEndY + Math.sin(sideViewAngle) * sideViewWidth * smoothCurvature(curvatureDirection * normalizedCurvature);
+  
+  // Draw the side view of the tail fin
+  ctx.beginPath();
+  ctx.moveTo(sideViewStartX, sideViewStartY);
+  
+  // Create a more pronounced curve for the side view with smoother transitions
+  // Use the same base angle for both control points to avoid sudden flips
+  // Use a more gradual angle change for smoother transitions
+  const baseSideAngle = tailTipAngle - Math.PI + Math.PI/6 * smoothCurvature(curvatureDirection * normalizedCurvature);
+  
+  // Use a more gradual curve for the side view
+  const sideViewCp1x = sideViewStartX + Math.cos(baseSideAngle) * sideViewHeight * 0.4;
+  const sideViewCp1y = sideViewStartY + Math.sin(baseSideAngle) * sideViewHeight * 0.4;
+  
+  const sideViewCp2x = sideViewEndX + Math.cos(baseSideAngle) * sideViewHeight * 0.4;
+  const sideViewCp2y = sideViewEndY + Math.sin(baseSideAngle) * sideViewHeight * 0.4;
+  
+  // Use a smoother Bezier curve for the side view
+  ctx.bezierCurveTo(sideViewCp1x, sideViewCp1y, sideViewCp2x, sideViewCp2y, sideViewEndX, sideViewEndY);
+  
+  // Connect the side view to the main tail fin for a unified look
+  // Use a smooth curve to connect the side view to the main tail fin
+  ctx.lineTo(tailEndX, tailEndY);
+  ctx.lineTo(tailStartX, tailStartY);
+  ctx.lineTo(sideViewStartX, sideViewStartY);
+  
+  ctx.strokeStyle = "#990000";
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  
+  // Fill the side view
+  ctx.beginPath();
+  ctx.moveTo(sideViewStartX, sideViewStartY);
+  ctx.bezierCurveTo(sideViewCp1x, sideViewCp1y, sideViewCp2x, sideViewCp2y, sideViewEndX, sideViewEndY);
+  ctx.lineTo(tailEndX, tailEndY);
+  ctx.lineTo(tailStartX, tailStartY);
+  ctx.lineTo(sideViewStartX, sideViewStartY);
+  ctx.fillStyle = "#cc0000";
+  ctx.fill();
+  
+  // Add a subtle gradient to the tail fin for a more natural look
+  const gradient = ctx.createLinearGradient(tailStartX, tailStartY, tailEndX, tailEndY);
+  gradient.addColorStop(0, "#cc0000");
+  gradient.addColorStop(1, "#990000");
+  
+  // Apply the gradient to the tail fin
+  ctx.beginPath();
+  ctx.moveTo(tailStartX, tailStartY);
+  ctx.bezierCurveTo(tailCp1x, tailCp1y, tailCp2x, tailCp2y, tailEndX, tailEndY);
+  ctx.lineTo(tailStartX, tailStartY);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  
+  ctx.restore();
+
   // Draw eyes
   const leftEye: Eye = {
     radius: 12,
@@ -337,6 +522,9 @@ function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
     const primaryOscillation = Math.sin(time) * maxOscillation;
     const secondaryOscillation = Math.sin(time * 1.5) * maxOscillation * 0.5;
     const oscillation = (primaryOscillation + secondaryOscillation) * distanceScale;
+    
+    // Add a small amount of oscillation to the fin angles for more dynamic movement
+    const finOscillation = Math.sin(time * 2) * 0.05;
     
     node.angle += oscillation;
     
@@ -422,8 +610,8 @@ const creature = generateCreatureNodes(
   canvas.width / 2,
   canvas.height / 2,
   [
-    45, 48, 54, 54, 54, 54, 51, 48, 45, 42, 42, 42, 39, 36, 33, 30, 27, 24, 21, 18,
-    15
+    45, 48, 50, 56, 56, 54, 54, 51, 48, 45, 42, 41, 40, 38, 33, 30, 27, 24, 21, 18,
+    15, 10, 8
   ] // Custom radius values for each node
 );
 
