@@ -1,17 +1,18 @@
 import "./style.css";
 
-interface Point {
+const NODE_SPACING = 10;
+
+type CreatureNode = {
+  radius: number;
   x: number;
   y: number;
-  targetX: number;
-  targetY: number;
-  constraints: Array<{
-    targetIndex: number;
-    targetDistance: number;
-    maxAngle: number;
-  }>;
-  radius: number;
-}
+  angle: number; // in radians
+};
+
+type Target = {
+  x: number;
+  y: number;
+};
 
 function initializeCanvas() {
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -22,216 +23,270 @@ function initializeCanvas() {
   return { canvas, ctx };
 }
 
-function createCreature(x: number, y: number): Point[] {
-  const createSegment = (
-    x: number,
-    y: number,
-    targetIndex: number | null,
-    radius: number
-  ): Point => ({
-    x,
-    y,
-    targetX: x,
-    targetY: y,
-    constraints:
-      targetIndex !== null
-        ? [
-            {
-              targetIndex,
-              targetDistance: 50,
-              maxAngle: Math.PI / 12,
-            },
-          ]
-        : [],
-    radius,
-  });
+function drawCreature(ctx: CanvasRenderingContext2D, creature: CreatureNode[]) {
+  // Draw the creature body
+  ctx.beginPath();
+  ctx.fillStyle = "#ff0000"; // Bright red for fill
 
-  return [
-    createSegment(x, y, null, 8),
-    createSegment(x + 50, y, 0, 10),
-    createSegment(x + 100, y, 1, 15),
-    createSegment(x + 150, y, 2, 10),
-    createSegment(x + 200, y, 3, 8),
-  ];
-}
+  // Start from the left side of the head
+  const head = creature[0];
+  ctx.moveTo(
+    head.x + Math.cos(head.angle - Math.PI / 2) * head.radius,
+    head.y + Math.sin(head.angle - Math.PI / 2) * head.radius
+  );
 
-function interpolatePosition(
-  current: number,
-  target: number,
-  speed: number
-): number {
-  const diff = target - current;
-  if (Math.abs(diff) < speed) return target;
-  return current + Math.sign(diff) * speed;
-}
+  // Head's left intermediate
+  ctx.lineTo(
+    head.x + Math.cos(head.angle - Math.PI / 4) * head.radius,
+    head.y + Math.sin(head.angle - Math.PI / 4) * head.radius
+  );
 
-function updateHeadSegment(current: Point, time: number): Point {
-  const speed = 5;
-  const dx = current.targetX - current.x;
-  const dy = current.targetY - current.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
+  // Head's forward point
+  ctx.lineTo(
+    head.x + Math.cos(head.angle) * head.radius,
+    head.y + Math.sin(head.angle) * head.radius
+  );
 
-  if (distance < 10) {
-    return {
-      ...current,
-      x: interpolatePosition(current.x, current.targetX, speed),
-      y: interpolatePosition(current.y, current.targetY, speed),
-    };
-  }
+  // Head's right intermediate
+  ctx.lineTo(
+    head.x + Math.cos(head.angle + Math.PI / 4) * head.radius,
+    head.y + Math.sin(head.angle + Math.PI / 4) * head.radius
+  );
 
-  const baseAngle = Math.atan2(dy, dx);
-  const angleModulation = Math.sin(time * 2) * (Math.PI / 12);
-  const finalAngle = baseAngle + angleModulation;
+  // Head's right side
+  ctx.lineTo(
+    head.x + Math.cos(head.angle + Math.PI / 2) * head.radius,
+    head.y + Math.sin(head.angle + Math.PI / 2) * head.radius
+  );
 
-  return {
-    ...current,
-    x: current.x + Math.cos(finalAngle) * speed,
-    y: current.y + Math.sin(finalAngle) * speed,
-  };
-}
-
-function constrainSegmentAngle(
-  target: { x: number; y: number },
-  prevPoint: Point,
-  prevPrevPoint: Point,
-  constraint: Point["constraints"][0]
-): { x: number; y: number } {
-  const v1x = prevPoint.x - prevPrevPoint.x;
-  const v1y = prevPoint.y - prevPrevPoint.y;
-  const v2x = target.x - prevPoint.x;
-  const v2y = target.y - prevPoint.y;
-
-  const dot = v1x * v2x + v1y * v2y;
-  const det = v1x * v2y - v1y * v2x;
-  const angle = Math.atan2(det, dot);
-
-  if (Math.abs(angle) <= constraint.maxAngle) {
-    return { x: target.x, y: target.y };
-  }
-
-  const sign = Math.sign(angle);
-  const limitedAngle = sign * constraint.maxAngle;
-  const v1Length = Math.sqrt(v1x * v1x + v1y * v1y);
-  const normalizedV1x = v1x / v1Length;
-  const normalizedV1y = v1y / v1Length;
-
-  const cos = Math.cos(limitedAngle);
-  const sin = Math.sin(limitedAngle);
-  const rotatedX = normalizedV1x * cos - normalizedV1y * sin;
-  const rotatedY = normalizedV1x * sin + normalizedV1y * cos;
-
-  return {
-    x: prevPoint.x + rotatedX * constraint.targetDistance,
-    y: prevPoint.y + rotatedY * constraint.targetDistance,
-  };
-}
-
-function updateSegmentPosition(
-  current: Point,
-  points: Point[],
-  index: number,
-  time: number
-): Point {
-  if (index === 0) {
-    return updateHeadSegment(current, time);
-  }
-
-  const constraint = current.constraints[0];
-  const target = points[constraint.targetIndex];
-
-  const dx = target.x - current.x;
-  const dy = target.y - current.y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-
-  let targetPos = {
-    x: target.x - (dx / distance) * constraint.targetDistance,
-    y: target.y - (dy / distance) * constraint.targetDistance,
-  };
-
-  if (index > 1) {
-    targetPos = constrainSegmentAngle(
-      targetPos,
-      points[index - 1],
-      points[index - 2],
-      constraint
+  // Connect through all body segments
+  for (let i = 1; i < creature.length - 1; i++) {
+    const node = creature[i];
+    // Right side
+    ctx.lineTo(
+      node.x + Math.cos(node.angle + Math.PI / 2) * node.radius,
+      node.y + Math.sin(node.angle + Math.PI / 2) * node.radius
     );
   }
 
-  const speed = 4 * (1 - index * 0.15);
-  const newX = interpolatePosition(current.x, targetPos.x, speed);
-  const newY = interpolatePosition(current.y, targetPos.y, speed);
+  // Tail's right side
+  const tail = creature[creature.length - 1];
+  ctx.lineTo(
+    tail.x + Math.cos(tail.angle + Math.PI / 2) * tail.radius,
+    tail.y + Math.sin(tail.angle + Math.PI / 2) * tail.radius
+  );
 
-  const dx2 = newX - target.x;
-  const dy2 = newY - target.y;
-  const currentDistance = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+  // Tail's right intermediate
+  ctx.lineTo(
+    tail.x + Math.cos(tail.angle + (3 * Math.PI) / 4) * tail.radius,
+    tail.y + Math.sin(tail.angle + (3 * Math.PI) / 4) * tail.radius
+  );
 
-  if (Math.abs(currentDistance - constraint.targetDistance) > 0.1) {
-    const scale = constraint.targetDistance / currentDistance;
-    return {
-      ...current,
-      x: target.x + dx2 * scale,
-      y: target.y + dy2 * scale,
-    };
+  // Tail's back point
+  ctx.lineTo(
+    tail.x + Math.cos(tail.angle + Math.PI) * tail.radius,
+    tail.y + Math.sin(tail.angle + Math.PI) * tail.radius
+  );
+
+  // Tail's left intermediate
+  ctx.lineTo(
+    tail.x + Math.cos(tail.angle - (3 * Math.PI) / 4) * tail.radius,
+    tail.y + Math.sin(tail.angle - (3 * Math.PI) / 4) * tail.radius
+  );
+
+  // Tail's left side
+  ctx.lineTo(
+    tail.x + Math.cos(tail.angle - Math.PI / 2) * tail.radius,
+    tail.y + Math.sin(tail.angle - Math.PI / 2) * tail.radius
+  );
+
+  // Connect back through all body segments
+  for (let i = creature.length - 2; i > 0; i--) {
+    const node = creature[i];
+    // Left side
+    ctx.lineTo(
+      node.x + Math.cos(node.angle - Math.PI / 2) * node.radius,
+      node.y + Math.sin(node.angle - Math.PI / 2) * node.radius
+    );
   }
 
-  return {
-    ...current,
-    x: newX,
-    y: newY,
-  };
+  // Close the path back to the head's left side
+  ctx.closePath();
+  ctx.fill();
 }
 
-function renderCreature(
-  ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  points: Point[]
+function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
+  const dx = target.x - node.x;
+  const dy = target.y - node.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  if (distance > 0.1) {
+    // Calculate target angle
+    const targetAngle = Math.atan2(dy, dx);
+    
+    // If we're close enough to the target, snap to the correct angle
+    if (distance < 0.1) {
+      node.angle = targetAngle;
+    } else {
+      // Calculate angle difference, ensuring it's between -PI and PI
+      let angleDiff = targetAngle - node.angle;
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+      
+      // Gradually adjust angle when far away
+      node.angle += angleDiff * 0.1;
+    }
+    
+    // Calculate easing factor based on distance
+    // More gradual easing with smaller distance thresholds
+    const easingFactor = Math.min(1, Math.min(distance / 100, distance / 20));
+    const currentSpeed = speed * easingFactor;
+    
+    // Add oscillation to head angle while moving
+    // Scale oscillation based on both distance and speed
+    const maxOscillation = 0.07; // Maximum oscillation amplitude (about 1.7 degrees)
+    const distanceScale = Math.min(1, distance / 50); // Scale down when closer than 50 pixels
+    const oscillation = Math.sin(Date.now() * 0.003) * maxOscillation * distanceScale * (currentSpeed / speed);
+    node.angle += oscillation;
+    
+    // Move in current direction with eased speed
+    node.x += Math.cos(node.angle) * currentSpeed;
+    node.y += Math.sin(node.angle) * currentSpeed;
+  } else {
+    // Snap to target when close enough
+    node.x = target.x;
+    node.y = target.y;
+    // Keep the last angle when stopped
+  }
+}
+
+function updateFollowerNode(
+  follower: CreatureNode,
+  leader: CreatureNode,
+  distance: number
 ) {
-  // Background
-  ctx.fillStyle = "#8ba3b8";
+  const dx = leader.x - follower.x;
+  const dy = leader.y - follower.y;
+  const currentDistance = Math.sqrt(dx * dx + dy * dy);
+
+  if (currentDistance > 0) {
+    const ratio = NODE_SPACING / currentDistance;
+    follower.x = leader.x - dx * ratio;
+    follower.y = leader.y - dy * ratio;
+
+    // Calculate desired angle
+    const desiredAngle = Math.atan2(dy, dx);
+
+    // Calculate angle difference, ensuring it's between -PI and PI
+    let angleDiff = desiredAngle - leader.angle;
+    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+    // Constrain angle difference to between -45 and +45 degrees (π/4 radians)
+    if (angleDiff > Math.PI / 4) {
+      angleDiff = Math.PI / 4;
+    } else if (angleDiff < -Math.PI / 4) {
+      angleDiff = -Math.PI / 4;
+    }
+
+    // Set the follower's angle based on the constrained difference
+    follower.angle = leader.angle + angleDiff;
+
+    // Update position to maintain distance with new angle
+    follower.x = leader.x - Math.cos(follower.angle) * NODE_SPACING;
+    follower.y = leader.y - Math.sin(follower.angle) * NODE_SPACING;
+  }
+}
+
+function generateCreatureNodes(
+  startX: number,
+  startY: number,
+  radiusValues?: number[]
+): CreatureNode[] {
+  const nodes: CreatureNode[] = [];
+  const baseRadius = 25;
+  const numNodes = radiusValues?.length;
+
+  if (!numNodes) {
+    throw new Error("No radius values provided");
+  }
+
+  for (let i = 0; i < numNodes; i++) {
+    nodes.push({
+      radius: radiusValues?.[i] ?? baseRadius - i * 2,
+      x: startX + i * NODE_SPACING,
+      y: startY,
+      angle: Math.PI, // 180 degrees, pointing left
+    });
+  }
+
+  return nodes;
+}
+
+// Initialize and start animation
+const { canvas, ctx } = initializeCanvas();
+
+// Create creature and target outside the animation loop
+const creature = generateCreatureNodes(
+  canvas.width / 2,
+  canvas.height / 2,
+  [
+    15, 16, 18, 18, 18, 18, 17, 16, 15, 14, 14, 14, 13, 12, 11, 10, 9, 8, 7, 6,
+    5,
+  ] // Custom radius values for each node
+);
+
+const target: Target = {
+  x: canvas.width / 2,
+  y: canvas.height / 2,
+};
+
+// Handle mouse events
+let isMouseDown = false;
+
+canvas.addEventListener("mousedown", (event) => {
+  if (event.button === 0) { // Left mouse button
+    isMouseDown = true;
+    updateTargetPosition(event);
+  }
+});
+
+canvas.addEventListener("mouseup", (event) => {
+  if (event.button === 0) { // Left mouse button
+    isMouseDown = false;
+  }
+});
+
+canvas.addEventListener("mousemove", (event) => {
+  if (isMouseDown) {
+    updateTargetPosition(event);
+  }
+});
+
+function updateTargetPosition(event: MouseEvent) {
+  const rect = canvas.getBoundingClientRect();
+  target.x = event.clientX - rect.left;
+  target.y = event.clientY - rect.top;
+}
+
+function animate() {
+  // Clear the canvas
+  ctx.fillStyle = "#a8d5ff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw connecting lines
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
-  }
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 4;
-  ctx.stroke();
+  // Move head towards target
+  moveTowardsTarget(creature[0], target, 5);
 
-  // Draw points
-  points.forEach((point) => {
-    ctx.beginPath();
-    ctx.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 8;
-    ctx.stroke();
-  });
-}
-
-// Animation and initialization
-function initializeAnimation() {
-  const { canvas, ctx } = initializeCanvas();
-  let creature = createCreature(canvas.width / 2, canvas.height / 2);
-  let time = 0;
-
-  canvas.addEventListener("click", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    creature[0].targetX = e.clientX - rect.left;
-    creature[0].targetY = e.clientY - rect.top;
-  });
-
-  function animate() {
-    time += 0.05;
-    for (let i = 0; i < creature.length; i++) {
-      creature[i] = updateSegmentPosition(creature[i], creature, i, time);
-    }
-    renderCreature(ctx, canvas, creature);
-    requestAnimationFrame(animate);
+  // Update follower nodes to maintain distance from their leaders
+  for (let i = 1; i < creature.length; i++) {
+    updateFollowerNode(creature[i], creature[i - 1], NODE_SPACING);
   }
 
-  animate();
+  // Draw the creature
+  drawCreature(ctx, creature);
+
+  // Request next frame
+  requestAnimationFrame(animate);
 }
 
-document.addEventListener("DOMContentLoaded", initializeAnimation);
+animate();
