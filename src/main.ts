@@ -826,25 +826,7 @@ function generateCreatureNodes(
 
 // Function to draw light rays for top-down view with animation
 function drawLightRays(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, time: number) {
-  // For top-down view, create a more subtle, scattered light pattern
-  const numLightSpots = 8;
-  
-  for (let i = 0; i < numLightSpots; i++) {
-    // Position light spots across the canvas
-    const x = (canvasWidth * (i / numLightSpots)) + Math.sin(time * 0.0005 + i) * 20;
-    const y = (canvasHeight * (i / numLightSpots)) + Math.cos(time * 0.0007 + i) * 20;
-    
-    // Create a subtle light spot
-    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 100);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.arc(x, y, 100, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Light effects removed
 }
 
 // Function to create a bubble particle
@@ -886,134 +868,35 @@ function createBubbleParticles(canvasWidth: number, canvasHeight: number, count:
 
 // Function to create a caustics pattern for top-down view
 function createCausticsPattern(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
-  // Create an off-screen canvas for the caustics pattern
-  const causticsCanvas = document.createElement('canvas');
-  causticsCanvas.width = canvasWidth;
-  causticsCanvas.height = canvasHeight;
-  const causticsCtx = causticsCanvas.getContext('2d');
-  if (!causticsCtx) throw new Error("Failed to get 2d context for caustics canvas");
-  
-  // Fill with a very subtle blue-green color
-  causticsCtx.fillStyle = 'rgba(0, 50, 100, 0.1)';
-  causticsCtx.fillRect(0, 0, canvasWidth, canvasHeight);
-  
-  // Draw some organic shapes to simulate caustics
-  const numShapes = 20;
-  for (let i = 0; i < numShapes; i++) {
-    const x = Math.random() * canvasWidth;
-    const y = Math.random() * canvasHeight;
-    const size = 30 + Math.random() * 80;
-    
-    // Create a gradient for each shape
-    const gradient = causticsCtx.createRadialGradient(x, y, 0, x, y, size);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    
-    causticsCtx.fillStyle = gradient;
-    
-    // Draw an organic shape - more circular for top-down view
-    causticsCtx.beginPath();
-    const numPoints = 12; // More points for smoother circles
-    for (let j = 0; j < numPoints; j++) {
-      const angle = (j / numPoints) * Math.PI * 2;
-      const radius = size * (0.8 + Math.random() * 0.4);
-      const px = x + Math.cos(angle) * radius;
-      const py = y + Math.sin(angle) * radius;
-      
-      if (j === 0) {
-        causticsCtx.moveTo(px, py);
-      } else {
-        causticsCtx.lineTo(px, py);
-      }
-    }
-    causticsCtx.closePath();
-    causticsCtx.fill();
-  }
-  
-  return causticsCanvas;
+  // Caustics effects removed
+  return document.createElement('canvas');
 }
 
 // Function to update the caustics pattern for top-down view
 function updateCausticsPattern(causticsPattern: HTMLCanvasElement, time: number) {
-  const causticsCtx = causticsPattern.getContext('2d');
-  if (!causticsCtx) return;
-  
-  // Clear the canvas
-  causticsCtx.clearRect(0, 0, causticsPattern.width, causticsPattern.height);
-  
-  // Fill with a very subtle blue-green color
-  causticsCtx.fillStyle = 'rgba(0, 50, 100, 0.1)';
-  causticsCtx.fillRect(0, 0, causticsPattern.width, causticsPattern.height);
-  
-  // Draw some organic shapes to simulate caustics with animation
-  const numShapes = 20;
-  for (let i = 0; i < numShapes; i++) {
-    // Use the time parameter to create a subtle movement
-    const offsetX = Math.sin(time * 0.0005 + i * 0.5) * 30;
-    const offsetY = Math.cos(time * 0.0007 + i * 0.3) * 30;
-    
-    const x = (causticsPattern.width * (i / numShapes)) + offsetX;
-    const y = (causticsPattern.height * (i / numShapes)) + offsetY;
-    const size = 30 + Math.random() * 80;
-    
-    // Create a gradient for each shape
-    const gradient = causticsCtx.createRadialGradient(x, y, 0, x, y, size);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.02)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    
-    causticsCtx.fillStyle = gradient;
-    
-    // Draw an organic shape - more circular for top-down view
-    causticsCtx.beginPath();
-    const numPoints = 12; // More points for smoother circles
-    for (let j = 0; j < numPoints; j++) {
-      const angle = (j / numPoints) * Math.PI * 2 + time * 0.0002; // Slower rotation
-      const radius = size * (0.8 + Math.random() * 0.4);
-      const px = x + Math.cos(angle) * radius;
-      const py = y + Math.sin(angle) * radius;
-      
-      if (j === 0) {
-        causticsCtx.moveTo(px, py);
-      } else {
-        causticsCtx.lineTo(px, py);
-      }
-    }
-    causticsCtx.closePath();
-    causticsCtx.fill();
-  }
+  // Caustics effects removed
 }
 
 // Function to apply caustics effect
 function applyCausticsEffect(ctx: CanvasRenderingContext2D, causticsPattern: HTMLCanvasElement, canvasWidth: number, canvasHeight: number) {
-  // Save the current context state
-  ctx.save();
-  
-  // Set the blend mode to overlay for a light effect
-  ctx.globalCompositeOperation = 'overlay';
-  
-  // Draw the caustics pattern
-  ctx.drawImage(causticsPattern, 0, 0, canvasWidth, canvasHeight);
-  
-  // Restore the context state
-  ctx.restore();
+  // Caustics effects removed
 }
 
 function animate() {
-  // Clear the canvas with a deeper blue color for underwater effect
-  ctx.fillStyle = "#0a2a4a";
+  // Clear the canvas with a radial gradient from center
+  const gradient = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, 0,  // Start at center
+    canvas.width / 2, canvas.height / 2, canvas.width / 1.5  // End at edges
+  );
+  gradient.addColorStop(0, "#2a7a8a");  // Green-blue in the middle
+  gradient.addColorStop(0.5, "#2a5a9a");  // Blue in the middle area
+  gradient.addColorStop(1, "#1a4a7a");  // Darker blue at the edges
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   
-  // Get current time for animations
-  const currentTime = Date.now();
-  
-  // Draw light rays with animation
-  drawLightRays(ctx, canvas.width, canvas.height, currentTime);
-  
-  // Update and apply caustics effect
-  updateCausticsPattern(causticsPattern, currentTime);
-  applyCausticsEffect(ctx, causticsPattern, canvas.width, canvas.height);
+  // Add a subtle green tint overlay
+  ctx.fillStyle = "rgba(100, 150, 100, 0.2)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Update and draw particles
   for (let layerIndex = 0; layerIndex < particleLayers.length; layerIndex++) {
