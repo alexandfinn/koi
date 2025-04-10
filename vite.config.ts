@@ -5,4 +5,5 @@ export default defineConfig({
     outDir: "dist",
     assetsDir: "assets",
   },
+  base: "https://koi.alexandfinn.com/",
 });
