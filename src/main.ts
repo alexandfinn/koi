@@ -859,7 +859,13 @@ type Food = {
   x: number;
   y: number;
   size: number;
+  initialSize: number;
+  targetSize: number;
   eaten: boolean;
+  age: number;
+  maxAge: number;
+  floatOffset: number; // For floating animation
+  floatSpeed: number; // Speed of floating animation
 };
 
 type Ripple = {
@@ -923,8 +929,15 @@ function drawRipple(ctx: CanvasRenderingContext2D, ripple: Ripple) {
 function drawFood(ctx: CanvasRenderingContext2D, food: Food) {
   if (food.eaten) return;
   
+  // Calculate current size based on age
+  const progress = Math.min(1, food.age / food.maxAge);
+  const currentSize = food.initialSize - (food.initialSize - food.targetSize) * progress;
+  
+  // Calculate floating position
+  const floatY = Math.sin(food.age * food.floatSpeed) * food.floatOffset;
+  
   ctx.beginPath();
-  ctx.arc(food.x, food.y, food.size, 0, Math.PI * 2);
+  ctx.arc(food.x, food.y + floatY, currentSize, 0, Math.PI * 2);
   ctx.fillStyle = "#ffd700"; // Gold color for food
   ctx.fill();
   
@@ -967,17 +980,11 @@ function animate() {
     drawParticle(ctx, bubbleParticles[i]);
   }
 
-  // Update and draw ripples
-  ripples = ripples.filter(ripple => {
-    const isActive = updateRipple(ripple);
-    if (isActive) {
-      drawRipple(ctx, ripple);
-    }
-    return isActive;
-  });
-
-  // Draw all food
+  // Update and draw food
   for (const food of foods) {
+    if (!food.eaten) {
+      food.age += 1; // Increment age
+    }
     drawFood(ctx, food);
   }
 
@@ -1019,6 +1026,15 @@ function animate() {
 
   // Draw the creature
   drawCreature(ctx, creature);
+  
+  // Update and draw ripples AFTER the fish is drawn
+  ripples = ripples.filter(ripple => {
+    const isActive = updateRipple(ripple);
+    if (isActive) {
+      drawRipple(ctx, ripple);
+    }
+    return isActive;
+  });
 
   // Apply pixelation effect
   pixelCtx.imageSmoothingEnabled = false;
@@ -1099,12 +1115,18 @@ canvas.addEventListener("click", (event) => {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
   
-  // Create new food
+  // Create new food with smaller initial size and longer animation
   foods.push({
     x,
     y,
-    size: 8,
-    eaten: false
+    initialSize: 12, // Smaller initial size (was 16)
+    size: 12, // Current size (will be updated in drawFood)
+    targetSize: 6, // Smaller final size (was 8)
+    eaten: false,
+    age: 0,
+    maxAge: 120, // About 2 seconds at 60fps (was 60)
+    floatOffset: 2 + Math.random() * 1.5, // Smaller float amplitude
+    floatSpeed: 0.01 + Math.random() * 0.005 // Much slower float speed (was 0.05 + random * 0.03)
   });
   
   // Create multiple ripple effects
