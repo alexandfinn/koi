@@ -7,6 +7,8 @@ type CreatureNode = {
   x: number;
   y: number;
   angle: number; // in radians
+  speedX: number; // velocity in x direction
+  speedY: number; // velocity in y direction
 };
 
 type Eye = {
@@ -768,13 +770,24 @@ function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
     
     node.angle += oscillation;
     
+    // Calculate velocity components
+    const vx = Math.cos(node.angle) * currentSpeed;
+    const vy = Math.sin(node.angle) * currentSpeed;
+    
+    // Update velocity with some smoothing
+    node.speedX = node.speedX * 0.7 + vx * 0.3;
+    node.speedY = node.speedY * 0.7 + vy * 0.3;
+    
     // Move in current direction with eased speed
-    node.x += Math.cos(node.angle) * currentSpeed;
-    node.y += Math.sin(node.angle) * currentSpeed;
+    node.x += node.speedX;
+    node.y += node.speedY;
   } else {
     // Snap to target when close enough
     node.x = target.x;
     node.y = target.y;
+    // Gradually reduce velocity when stopped
+    node.speedX *= 0.8;
+    node.speedY *= 0.8;
     // Keep the last angle when stopped
   }
 }
@@ -835,6 +848,8 @@ function generateCreatureNodes(
       x: startX + i * NODE_SPACING,
       y: startY,
       angle: Math.PI, // 180 degrees, pointing left
+      speedX: 0,
+      speedY: 0
     });
   }
 
@@ -984,6 +999,12 @@ type VoronoiPoint = {
   phase: number;
   amplitude: number;
   speed: number;
+  disturbance?: {
+    startTime: number;
+    duration: number;
+    strength: number;
+    angle: number;
+  };
 };
 
 // Add after the existing functions, before initialization
@@ -1038,8 +1059,46 @@ function createVoronoiPoints(width: number, height: number, count: number): Voro
 
 function updateVoronoiPoints(points: VoronoiPoint[], time: number) {
   for (const point of points) {
-    point.x = point.baseX + Math.cos(time * point.speed + point.phase) * point.amplitude;
-    point.y = point.baseY + Math.sin(time * point.speed * 1.5 + point.phase) * point.amplitude;
+    let xOffset = 0;
+    let yOffset = 0;
+    
+    // Apply disturbance if it exists and is still active
+    if (point.disturbance) {
+      const elapsed = time - point.disturbance.startTime;
+      if (elapsed < point.disturbance.duration) {
+        // Calculate disturbance strength based on elapsed time with a smoother fade
+        const progress = elapsed / point.disturbance.duration;
+        
+        // Use a smoother easing function (ease-out cubic)
+        const easeOutCubic = 1 - Math.pow(1 - progress, 3);
+        
+        // Apply a gradual ramp-up and ramp-down
+        let strengthMultiplier;
+        if (progress < 0.2) {
+          // Gradual ramp-up over first 20% of duration
+          strengthMultiplier = progress / 0.2;
+        } else if (progress > 0.8) {
+          // Gradual ramp-down over last 20% of duration
+          strengthMultiplier = (1 - progress) / 0.2;
+        } else {
+          // Full strength in the middle 60%
+          strengthMultiplier = 1;
+        }
+        
+        const strength = point.disturbance.strength * easeOutCubic * strengthMultiplier;
+        
+        // Apply disturbance offset
+        xOffset = Math.cos(point.disturbance.angle) * strength;
+        yOffset = Math.sin(point.disturbance.angle) * strength;
+      } else {
+        // Clear disturbance when it's done
+        point.disturbance = undefined;
+      }
+    }
+    
+    // Apply normal movement plus disturbance
+    point.x = point.baseX + Math.cos(time * point.speed + point.phase) * point.amplitude + xOffset;
+    point.y = point.baseY + Math.sin(time * point.speed * 1.5 + point.phase) * point.amplitude + yOffset;
   }
 }
 
@@ -1100,6 +1159,67 @@ function drawVoronoi(ctx: CanvasRenderingContext2D, points: VoronoiPoint[], widt
           ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
           ctx.fillRect(x, y, cellSize, cellSize);
         }
+      }
+    }
+  }
+}
+
+// Function to apply disturbances to Voronoi points based on fish movement
+function applyFishDisturbance(points: VoronoiPoint[], creature: CreatureNode[], time: number) {
+  // Calculate fish velocity based on the first node (head)
+  const head = creature[0];
+  
+  // Skip if the fish is not moving significantly
+  const speed = Math.sqrt(head.speedX * head.speedX + head.speedY * head.speedY);
+  if (speed < 0.5) return; // Threshold to avoid tiny disturbances
+  
+  // Calculate the center of the canvas for scaling
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  
+  // Convert fish position to virtual canvas coordinates
+  const centeredX = head.x - centerX;
+  const centeredY = head.y - centerY;
+  const virtualX = centeredX * 0.5 + centerX;
+  const virtualY = centeredY * 0.5 + centerY;
+  
+  // Calculate disturbance radius based on speed (faster = larger radius)
+  const baseRadius = 200;
+  const speedFactor = Math.min(3, 1 + speed / 2); // Cap at 3x
+  const disturbanceRadius = baseRadius * speedFactor;
+  
+  // Calculate movement direction
+  const moveAngle = Math.atan2(head.speedY, head.speedX);
+  
+  // Apply disturbances to points near the fish
+  for (const point of points) {
+    const dx = point.baseX - virtualX;
+    const dy = point.baseY - virtualY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < disturbanceRadius) {
+      // Calculate disturbance strength based on distance and speed
+      // Reduced by a factor of 20 (from 40 to 2)
+      const distanceFactor = 1 - (distance / disturbanceRadius);
+      const strength = 4 * distanceFactor * speedFactor;
+      
+      // Calculate angle - points move away from fish in the direction of movement
+      const angle = moveAngle + Math.PI + (Math.random() - 0.5) * 0.5; // Add slight randomness
+      
+      // Only add disturbance if point doesn't already have one or if this one is stronger
+      const currentStrength = point.disturbance ? point.disturbance.strength : 0;
+      
+      if (strength > currentStrength) {
+        // Duration varies based on distance and speed
+        const baseDuration = 2000; // 2 seconds base duration
+        const duration = baseDuration * (1 + distance / disturbanceRadius) + Math.random() * 500;
+        
+        point.disturbance = {
+          startTime: time,
+          duration: duration,
+          strength: strength,
+          angle: angle
+        };
       }
     }
   }
@@ -1274,6 +1394,9 @@ function animate() {
   const time = Date.now();
   updateVoronoiPoints(voronoiPoints, time);
   
+  // Apply fish disturbance to Voronoi points
+  applyFishDisturbance(voronoiPoints, creature, time);
+  
   // Draw Voronoi pattern at the top (original position)
   drawVoronoi(ctx, voronoiPoints, canvas.width, canvas.height);
   
@@ -1398,6 +1521,47 @@ canvas.addEventListener("click", (event) => {
   
   // Create multiple ripple effects
   ripples.push(...createRipples(x, y));
+  
+  // Create disturbances in Voronoi points near the drop point
+  const currentTime = Date.now();
+  const disturbanceRadius = 300; // Increased radius to account for scaling (2x)
+  
+  // Calculate the center of the canvas for scaling
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  
+  // Convert click coordinates to virtual canvas coordinates
+  const centeredX = x - centerX;
+  const centeredY = y - centerY;
+  const virtualX = centeredX * 0.5 + centerX;
+  const virtualY = centeredY * 0.5 + centerY;
+  
+  for (const point of voronoiPoints) {
+    const dx = point.baseX - virtualX;
+    const dy = point.baseY - virtualY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    
+    if (distance < disturbanceRadius) {
+      // Calculate disturbance strength based on distance (stronger closer to drop point)
+      const strength = 60 * (1 - distance / disturbanceRadius); // Increased strength to account for scaling
+      
+      // Calculate angle away from drop point
+      const angle = Math.atan2(dy, dx);
+      
+      // Add disturbance to point with longer duration
+      // Duration varies based on distance - points further away have longer duration
+      const baseDuration = 3000; // 3 seconds base duration
+      const distanceFactor = 1 + (distance / disturbanceRadius) * 2; // Up to 3x longer for distant points
+      const duration = baseDuration * distanceFactor + Math.random() * 1000; // Add some randomness
+      
+      point.disturbance = {
+        startTime: currentTime,
+        duration: duration,
+        strength: strength,
+        angle: angle
+      };
+    }
+  }
   
   // Limit the number of food pieces to prevent too many
   if (foods.length > 5) {
