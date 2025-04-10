@@ -1104,11 +1104,7 @@ function updateVoronoiPoints(points: VoronoiPoint[], time: number) {
 
 function drawVoronoi(ctx: CanvasRenderingContext2D, points: VoronoiPoint[], width: number, height: number) {
   const cellSize = 12; // Keep the thicker lines
-  
-  // Calculate virtual canvas size (2x the actual canvas)
-  const virtualWidth = width * 2;
-  const virtualHeight = height * 2;
-  
+    
   // Calculate the center of the actual canvas
   const centerX = width / 2;
   const centerY = height / 2;
