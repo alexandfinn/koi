@@ -102,8 +102,6 @@ function initializeCanvas() {
   if (!pixelCtx) throw new Error("Failed to get 2d context for pixel canvas");
 
   function resizeCanvas() {
-    const pixelSize = 8; // Increased from 4 to 8 for more pixelation
-    
     // Set the display size (css pixels)
     canvas.style.width = `${window.innerWidth}px`;
     canvas.style.height = `${window.innerHeight}px`;
@@ -745,9 +743,6 @@ function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
     const secondaryOscillation = Math.sin(time * 1.5) * maxOscillation * 0.5;
     const oscillation = (primaryOscillation + secondaryOscillation) * distanceScale;
     
-    // Add a small amount of oscillation to the fin angles for more dynamic movement
-    const finOscillation = Math.sin(time * 2) * 0.05;
-    
     node.angle += oscillation;
     
     // Move in current direction with eased speed
@@ -763,8 +758,7 @@ function moveTowardsTarget(node: CreatureNode, target: Target, speed: number) {
 
 function updateFollowerNode(
   follower: CreatureNode,
-  leader: CreatureNode,
-  distance: number
+  leader: CreatureNode
 ) {
   const dx = leader.x - follower.x;
   const dy = leader.y - follower.y;
@@ -824,21 +818,16 @@ function generateCreatureNodes(
   return nodes;
 }
 
-// Function to draw light rays for top-down view with animation
-function drawLightRays(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, time: number) {
-  // Light effects removed
-}
-
 // Function to create a bubble particle
 function createBubbleParticle(canvasWidth: number, canvasHeight: number): Particle {
   return {
     x: Math.random() * canvasWidth,
-    y: Math.random() * canvasHeight, // For top-down view, bubbles can appear anywhere
+    y: Math.random() * canvasHeight,
     size: 2 + Math.random() * 4,
     speedX: (Math.random() - 0.5) * 0.5,
-    speedY: (Math.random() - 0.5) * 0.5, // For top-down view, bubbles can move in any direction
+    speedY: (Math.random() - 0.5) * 0.5,
     opacity: 0.3 + Math.random() * 0.4,
-    depth: Math.random() * 0.5 // Bubbles are always in the foreground
+    depth: Math.random() * 0.5
   };
 }
 
@@ -864,22 +853,6 @@ function createBubbleParticles(canvasWidth: number, canvasHeight: number, count:
   }
   
   return bubbles;
-}
-
-// Function to create a caustics pattern for top-down view
-function createCausticsPattern(ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number) {
-  // Caustics effects removed
-  return document.createElement('canvas');
-}
-
-// Function to update the caustics pattern for top-down view
-function updateCausticsPattern(causticsPattern: HTMLCanvasElement, time: number) {
-  // Caustics effects removed
-}
-
-// Function to apply caustics effect
-function applyCausticsEffect(ctx: CanvasRenderingContext2D, causticsPattern: HTMLCanvasElement, canvasWidth: number, canvasHeight: number) {
-  // Caustics effects removed
 }
 
 function animate() {
@@ -922,7 +895,7 @@ function animate() {
 
   // Update follower nodes to maintain distance from their leaders
   for (let i = 1; i < creature.length; i++) {
-    updateFollowerNode(creature[i], creature[i - 1], NODE_SPACING);
+    updateFollowerNode(creature[i], creature[i - 1]);
   }
 
   // Draw the creature
@@ -960,9 +933,6 @@ const particleLayers = createParticleLayers(canvas.width, canvas.height, 5, 50);
 
 // Create bubble particles
 const bubbleParticles = createBubbleParticles(canvas.width, canvas.height, 30);
-
-// Create caustics pattern
-const causticsPattern = createCausticsPattern(ctx, canvas.width, canvas.height);
 
 // Add the pixel canvas to the DOM
 document.body.appendChild(pixelCanvas);
