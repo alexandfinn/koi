@@ -41,13 +41,23 @@ type Particle = {
 
 // Function to create a particle
 function createParticle(canvasWidth: number, canvasHeight: number, depth: number): Particle {
+  // Make top layer particles 2x bigger
+  const sizeMultiplier = depth === 0 ? 1 : 1;
+  
+  // Make top layer particles less opaque
+  const opacityMultiplier = depth === 0 ? 0.5 : 1;
+  
+  // Make lower level particles much less opaque
+  // Apply a more aggressive opacity reduction for deeper particles
+  const depthOpacityFactor = Math.pow(1 - depth, 3); // Cubic falloff for more dramatic reduction
+  
   return {
     x: Math.random() * canvasWidth,
     y: Math.random() * canvasHeight,
-    size: 1 + Math.random() * 3 * (1 - depth), // Larger particles appear closer
+    size: (1 + Math.random() * 10 * (1 - depth)) * sizeMultiplier, // Larger particles appear closer, 2x for top layer
     speedX: (Math.random() - 0.5) * 0.5 * (1 - depth), // Slower movement for deeper particles
     speedY: (Math.random() - 0.5) * 0.5 * (1 - depth),
-    opacity: 0.1 + Math.random() * 0.3 * (1 - depth), // Less opacity for deeper particles
+    opacity: (0.1 + Math.random() * 0.3 * depthOpacityFactor) * opacityMultiplier, // Much less opacity for deeper particles
     depth: depth
   };
 }
@@ -69,7 +79,13 @@ function updateParticle(particle: Particle, canvasWidth: number, canvasHeight: n
 function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle) {
   ctx.beginPath();
   ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255, 255, 255, ${particle.opacity})`;
+  
+  // Add a greenish tint to the particles
+  // Adjust the green component based on depth - deeper particles are more green
+  const greenValue = 200 + Math.floor(55 * (1 - particle.depth));
+  const blueValue = 200 + Math.floor(55 * (1 - particle.depth));
+  
+  ctx.fillStyle = `rgba(200, ${greenValue}, ${blueValue}, ${particle.opacity})`;
   ctx.fill();
 }
 
@@ -77,11 +93,18 @@ function drawParticle(ctx: CanvasRenderingContext2D, particle: Particle) {
 function createParticleLayers(canvasWidth: number, canvasHeight: number, numLayers: number, particlesPerLayer: number): Particle[][] {
   const layers: Particle[][] = [];
   
+  // Create 5 layers with 2 above (depth 0, 0.25) and 3 below (depth 0.5, 0.75, 1.0)
+  const depthValues = [0, 0.25, 0.5, 0.75, 1.0];
+  
   for (let i = 0; i < numLayers; i++) {
-    const depth = i / (numLayers - 1); // 0 to 1
+    // Use the predefined depth values
+    const depth = depthValues[i % depthValues.length];
     const layer: Particle[] = [];
     
-    for (let j = 0; j < particlesPerLayer; j++) {
+    // Reduce the number of particles for the top layer
+    const particlesInThisLayer = depth === 0 ? Math.floor(particlesPerLayer / 2) : particlesPerLayer;
+    
+    for (let j = 0; j < particlesInThisLayer; j++) {
       layer.push(createParticle(canvasWidth, canvasHeight, depth));
     }
     
@@ -866,6 +889,7 @@ type Food = {
   maxAge: number;
   floatOffset: number; // For floating animation
   floatSpeed: number; // Speed of floating animation
+  reactionDelay: number; // Delay before fish reacts to this food
 };
 
 type Ripple = {
@@ -891,10 +915,10 @@ function createRipples(x: number, y: number): Ripple[] {
       x,
       y,
       radius: 0,
-      maxRadius: 150 + i * 50,  // Much larger difference in size between ripples
-      opacity: 0.9 - i * 0.15,  // Less reduction in opacity (was 0.3)
-      speed: 0.8 - i * 0.1,     // Less reduction in speed (was 0.2)
-      delay: i * 60             // Much longer delay between ripples
+      maxRadius: 200 + i * 80,  // Much larger ripples that expand further outward
+      opacity: 0.9 - i * 0.15,  // Less reduction in opacity
+      speed: 1.2 - i * 0.15,    // Faster initial speed for more outward movement
+      delay: i * 60             // Longer delay between ripples
     });
   }
   
@@ -907,8 +931,11 @@ function updateRipple(ripple: Ripple): boolean {
     return true;
   }
   
+  // Accelerate the ripple outward for a more dynamic effect
   ripple.radius += ripple.speed;
-  ripple.opacity = Math.max(0, ripple.opacity - 0.006); // Even slower fade out (was 0.008)
+  // Gradually slow down the ripple as it expands
+  ripple.speed *= 0.995;
+  ripple.opacity = Math.max(0, ripple.opacity - 0.005); // Slower fade out
   return ripple.radius < ripple.maxRadius && ripple.opacity > 0;
 }
 
@@ -948,101 +975,134 @@ function drawFood(ctx: CanvasRenderingContext2D, food: Food) {
   ctx.shadowBlur = 0;
 }
 
-function animate() {
-  // Clear the canvas with a radial gradient from center
-  const gradient = ctx.createRadialGradient(
-    canvas.width / 2, canvas.height / 2, 0,  // Start at center
-    canvas.width / 2, canvas.height / 2, canvas.width / 1.5  // End at edges
-  );
-  gradient.addColorStop(0, "#2a7a8a");  // Green-blue in the middle
-  gradient.addColorStop(0.5, "#2a5a9a");  // Blue in the middle area
-  gradient.addColorStop(1, "#1a4a7a");  // Darker blue at the edges
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+// Add after the existing type definitions
+type VoronoiPoint = {
+  x: number;
+  y: number;
+  baseX: number;
+  baseY: number;
+  phase: number;
+  amplitude: number;
+  speed: number;
+};
+
+// Add after the existing functions, before initialization
+function createVoronoiPoints(width: number, height: number, count: number): VoronoiPoint[] {
+  const points: VoronoiPoint[] = [];
+  const minDistance = 100; // Minimum distance between points
+  const maxAttempts = 50; // Maximum attempts to place each point
   
-  // Add a subtle green tint overlay
-  ctx.fillStyle = "rgba(100, 150, 100, 0.2)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Update and draw particles
-  for (let layerIndex = 0; layerIndex < particleLayers.length; layerIndex++) {
-    const layer = particleLayers[layerIndex];
+  for (let i = 0; i < count; i++) {
+    let attempts = 0;
+    let validPosition = false;
+    let baseX = 0;
+    let baseY = 0;
     
-    for (let i = 0; i < layer.length; i++) {
-      updateParticle(layer[i], canvas.width, canvas.height);
-      drawParticle(ctx, layer[i]);
+    // Try to find a valid position for the new point
+    while (!validPosition && attempts < maxAttempts) {
+      baseX = width * (0.2 + Math.random() * 0.6); // Keep points away from edges
+      baseY = height * (0.2 + Math.random() * 0.6);
+      
+      // Check distance from all existing points
+      validPosition = true;
+      for (const existingPoint of points) {
+        const dx = baseX - existingPoint.baseX;
+        const dy = baseY - existingPoint.baseY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance) {
+          validPosition = false;
+          break;
+        }
+      }
+      
+      attempts++;
+    }
+    
+    // If we found a valid position, add the point
+    if (validPosition) {
+      points.push({
+        x: baseX,
+        y: baseY,
+        baseX,
+        baseY,
+        phase: Math.random() * Math.PI * 2,
+        amplitude: 20 + Math.random() * 15, // Reduced amplitude from (30-70) to (10-25)
+        speed: (0.0002 + Math.random() * 0.0008) * 0.25 // Reduced speed by 60%
+      });
     }
   }
   
-  // Update and draw bubbles
-  for (let i = 0; i < bubbleParticles.length; i++) {
-    updateBubbleParticle(bubbleParticles[i], canvas.width, canvas.height);
-    drawParticle(ctx, bubbleParticles[i]);
-  }
+  return points;
+}
 
-  // Update and draw food
-  for (const food of foods) {
-    if (!food.eaten) {
-      food.age += 1; // Increment age
-    }
-    drawFood(ctx, food);
+function updateVoronoiPoints(points: VoronoiPoint[], time: number) {
+  for (const point of points) {
+    point.x = point.baseX + Math.cos(time * point.speed + point.phase) * point.amplitude;
+    point.y = point.baseY + Math.sin(time * point.speed * 1.5 + point.phase) * point.amplitude;
   }
+}
 
-  // Find the closest uneaten food
-  let closestFood: Food | null = null;
-  let closestDistance = Infinity;
+function drawVoronoi(ctx: CanvasRenderingContext2D, points: VoronoiPoint[], width: number, height: number) {
+  const cellSize = 12; // Keep the thicker lines
   
-  for (const food of foods) {
-    if (food.eaten) continue;
-    
-    const dx = food.x - creature[0].x;
-    const dy = food.y - creature[0].y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestFood = food;
-    }
-  }
-
-  // If there's food nearby, move towards it
-  if (closestFood && closestDistance < 300) {
-    target.x = closestFood.x;
-    target.y = closestFood.y;
-    
-    // Check if we're close enough to eat the food
-    if (closestDistance < 20) {
-      closestFood.eaten = true;
-    }
-  }
-
-  // Move head towards target
-  moveTowardsTarget(creature[0], target, 5);
-
-  // Update follower nodes to maintain distance from their leaders
-  for (let i = 1; i < creature.length; i++) {
-    updateFollowerNode(creature[i], creature[i - 1]);
-  }
-
-  // Draw the creature
-  drawCreature(ctx, creature);
+  // Calculate virtual canvas size (2x the actual canvas)
+  const virtualWidth = width * 2;
+  const virtualHeight = height * 2;
   
-  // Update and draw ripples AFTER the fish is drawn
-  ripples = ripples.filter(ripple => {
-    const isActive = updateRipple(ripple);
-    if (isActive) {
-      drawRipple(ctx, ripple);
+  // Calculate the center of the actual canvas
+  const centerX = width / 2;
+  const centerY = height / 2;
+  
+  for (let x = 0; x < width; x += cellSize) {
+    for (let y = 0; y < height; y += cellSize) {
+      // Convert canvas coordinates to centered coordinates
+      const centeredX = x - centerX;
+      const centeredY = y - centerY;
+      
+      // Scale up the coordinates to create the virtual canvas effect (2x bigger)
+      const virtualX = centeredX * 0.5 + centerX;
+      const virtualY = centeredY * 0.5 + centerY;
+      
+      // Find the closest point
+      let minDist = Infinity;
+      let closestPoint: VoronoiPoint | null = null;
+      let secondMinDist = Infinity;
+      
+      for (const point of points) {
+        const dx = virtualX - point.x;
+        const dy = virtualY - point.y;
+        const dist = dx * dx + dy * dy;
+        
+        if (dist < minDist) {
+          secondMinDist = minDist;
+          minDist = dist;
+          closestPoint = point;
+        } else if (dist < secondMinDist) {
+          secondMinDist = dist;
+        }
+      }
+      
+      if (closestPoint) {
+        // More gradual intensity calculation
+        const edgeIntensity = Math.min(1, (Math.sqrt(secondMinDist) - Math.sqrt(minDist)) / 35);
+        const intensity = Math.pow(1 - edgeIntensity, 1.5); // Less aggressive power for more gradual falloff
+        
+        if (intensity > 0.5) { // Lower threshold to show more of the pattern
+          // Calculate how close we are to a corner (where three or more cells meet)
+          const isCorner = edgeIntensity > 0.9;
+          
+          // Use different opacity for corners vs. regular edges
+          const opacity = isCorner 
+            ? Math.min(1, (intensity - 0.5) * 3) * 0.15  // Higher opacity for corners
+            : Math.min(1, (intensity - 0.5) * 3) * 0.03; // Lower opacity for regular edges
+          
+          ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+          ctx.fillRect(x, y, cellSize, cellSize);
+        }
+      }
     }
-    return isActive;
-  });
-
-  // Apply pixelation effect
-  pixelCtx.imageSmoothingEnabled = false;
-  pixelCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8);
-  pixelCtx.drawImage(pixelCanvas, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8, 0, 0, pixelCanvas.width, pixelCanvas.height);
-
-  // Request next frame
-  requestAnimationFrame(animate);
+  }
 }
 
 // Initialize and start animation
@@ -1069,6 +1129,9 @@ const particleLayers = createParticleLayers(canvas.width, canvas.height, 5, 50);
 // Create bubble particles
 const bubbleParticles = createBubbleParticles(canvas.width, canvas.height, 30);
 
+// Initialize Voronoi points
+const voronoiPoints = createVoronoiPoints(canvas.width, canvas.height, 72); // Increased from 18 to 72 points
+
 // Add the pixel canvas to the DOM
 document.body.appendChild(pixelCanvas);
 pixelCanvas.style.position = 'absolute';
@@ -1079,7 +1142,177 @@ pixelCanvas.style.pointerEvents = 'none'; // Make pixel canvas non-interactive
 canvas.style.position = 'absolute';
 canvas.style.top = '0';
 canvas.style.left = '0';
-canvas.style.zIndex = '0';
+
+// Start animation
+animate();
+
+function animate() {
+  // Clear the canvas with a radial gradient from center
+  const gradient = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, 0,  // Start at center
+    canvas.width / 2, canvas.height / 2, canvas.width / 1.5  // End at edges
+  );
+  gradient.addColorStop(0, "#2a7a8a");  // Green-blue in the middle
+  gradient.addColorStop(0.5, "#2a5a9a");  // Blue in the middle area
+  gradient.addColorStop(1, "#1a4a7a");  // Darker blue at the edges
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Add a subtle green tint overlay
+  ctx.fillStyle = "rgba(100, 150, 100, 0.2)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Update and draw the last two particle layers (depth 0.75 and 1.0) BEFORE the fish
+  for (let layerIndex = 3; layerIndex < particleLayers.length; layerIndex++) {
+    const layer = particleLayers[layerIndex];
+    
+    for (let i = 0; i < layer.length; i++) {
+      updateParticle(layer[i], canvas.width, canvas.height);
+      drawParticle(ctx, layer[i]);
+    }
+  }
+  
+  // Update and draw bubbles
+  for (let i = 0; i < bubbleParticles.length; i++) {
+    updateBubbleParticle(bubbleParticles[i], canvas.width, canvas.height);
+    drawParticle(ctx, bubbleParticles[i]);
+  }
+
+  // Update and draw food
+  for (const food of foods) {
+    if (!food.eaten) {
+      food.age += 16.67; // Increment age by ~16.67ms (assuming 60fps)
+    }
+    drawFood(ctx, food);
+  }
+
+  // Find closest uneaten food that we've had time to react to
+  let closestFood = null;
+  let minDistance = Infinity;
+  for (const food of foods) {
+    if (!food.eaten && food.age >= 0) { // Only react to food with positive age
+      const dx = food.x - creature[0].x;
+      const dy = food.y - creature[0].y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestFood = food;
+      }
+    }
+  }
+
+  // If there's food nearby, move towards it
+  if (closestFood && minDistance < 300) {
+    target.x = closestFood.x;
+    target.y = closestFood.y;
+    
+    // Check if we're close enough to eat the food
+    if (minDistance < 20) {
+      closestFood.eaten = true;
+    }
+  }
+
+  // Move head towards target
+  moveTowardsTarget(creature[0], target, 5);
+
+  // Update follower nodes to maintain distance from their leaders
+  for (let i = 1; i < creature.length; i++) {
+    updateFollowerNode(creature[i], creature[i - 1]);
+  }
+
+  // Draw the creature
+  drawCreature(ctx, creature);
+  
+  // Update and draw ripples AFTER the fish is drawn
+  ripples = ripples.filter(ripple => {
+    const isActive = updateRipple(ripple);
+    if (isActive) {
+      drawRipple(ctx, ripple);
+    }
+    return isActive;
+  });
+
+  // Update and draw the first three particle layers (depth 0, 0.25, 0.5) AFTER the fish is drawn
+  for (let layerIndex = 0; layerIndex < 3; layerIndex++) {
+    const layer = particleLayers[layerIndex];
+    
+    for (let i = 0; i < layer.length; i++) {
+      updateParticle(layer[i], canvas.width, canvas.height);
+      drawParticle(ctx, layer[i]);
+    }
+  }
+
+  // Replace the Voronoi texture drawing code with:
+  ctx.globalCompositeOperation = 'lighter';
+  
+  // Update Voronoi points
+  const time = Date.now();
+  updateVoronoiPoints(voronoiPoints, time);
+  
+  // Draw Voronoi pattern at the top (original position)
+  drawVoronoi(ctx, voronoiPoints, canvas.width, canvas.height);
+  
+  // Draw Voronoi pattern as a shadow at the bottom with a slight offset
+  // Directly draw the shadow pattern with a different color and offset
+  ctx.save();
+  ctx.translate(0, 10); // Offset the shadow downward
+  ctx.globalAlpha = 0.7; // Make the shadow more visible
+  
+  // Draw the shadow pattern with a darker color
+  for (let x = 0; x < canvas.width; x += 12) {
+    for (let y = 0; y < canvas.height; y += 12) {
+      // Find the closest point
+      let minDist = Infinity;
+      let closestPoint: VoronoiPoint | null = null;
+      let secondMinDist = Infinity;
+      
+      for (const point of voronoiPoints) {
+        const dx = x - point.x;
+        const dy = y - point.y;
+        const dist = dx * dx + dy * dy;
+        
+        if (dist < minDist) {
+          secondMinDist = minDist;
+          minDist = dist;
+          closestPoint = point;
+        } else if (dist < secondMinDist) {
+          secondMinDist = dist;
+        }
+      }
+      
+      if (closestPoint) {
+        // More gradual intensity calculation
+        const edgeIntensity = Math.min(1, (Math.sqrt(secondMinDist) - Math.sqrt(minDist)) / 35);
+        const intensity = Math.pow(1 - edgeIntensity, 1.5); // Less aggressive power for more gradual falloff
+        
+        if (intensity > 0.5) { // Lower threshold to show more of the pattern
+          // Calculate how close we are to a corner (where three or more cells meet)
+          const isCorner = edgeIntensity > 0.9;
+          
+          // Use different opacity for corners vs. regular edges
+          const opacity = isCorner 
+            ? Math.min(1, (intensity - 0.5) * 3) * 0.2  // Higher opacity for corners
+            : Math.min(1, (intensity - 0.5) * 3) * 0.1; // Higher opacity for regular edges
+          
+          // Use a darker blue color for the shadow
+          ctx.fillStyle = `rgba(20, 20, 60, ${opacity})`;
+          ctx.fillRect(x, y, 12, 12);
+        }
+      }
+    }
+  }
+  ctx.restore();
+  
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Apply pixelation effect
+  pixelCtx.imageSmoothingEnabled = false;
+  pixelCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8);
+  pixelCtx.drawImage(pixelCanvas, 0, 0, pixelCanvas.width / 8, pixelCanvas.height / 8, 0, 0, pixelCanvas.width, pixelCanvas.height);
+
+  // Request next frame
+  requestAnimationFrame(animate);
+}
 
 // Handle mouse events
 let isMouseDown = false;
@@ -1115,18 +1348,27 @@ canvas.addEventListener("click", (event) => {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
   
+  // Calculate distance to fish
+  const dx = x - creature[0].x;
+  const dy = y - creature[0].y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  
+  // Calculate reaction delay based on distance (further = longer delay)
+  const reactionDelay = 200 + Math.floor(distance / 1.5); // Increased base delay and made distance factor more significant
+  
   // Create new food with smaller initial size and longer animation
   foods.push({
     x,
     y,
-    initialSize: 12, // Smaller initial size (was 16)
-    size: 12, // Current size (will be updated in drawFood)
-    targetSize: 6, // Smaller final size (was 8)
+    initialSize: 12,
+    size: 12,
+    targetSize: 6,
     eaten: false,
-    age: 0,
-    maxAge: 120, // About 2 seconds at 60fps (was 60)
+    age: -reactionDelay, // Start with negative age so it takes time to become positive
+    maxAge: 120, // About 2 seconds at 60fps
     floatOffset: 2 + Math.random() * 1.5, // Smaller float amplitude
-    floatSpeed: 0.01 + Math.random() * 0.005 // Much slower float speed (was 0.05 + random * 0.03)
+    floatSpeed: 0.01 + Math.random() * 0.005, // Much slower float speed
+    reactionDelay: reactionDelay // Add reaction delay
   });
   
   // Create multiple ripple effects
@@ -1137,5 +1379,3 @@ canvas.addEventListener("click", (event) => {
     foods = foods.filter(food => !food.eaten);
   }
 });
-
-animate();
